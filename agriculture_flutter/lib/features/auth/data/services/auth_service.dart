@@ -3,6 +3,7 @@ import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../models/user_model.dart';
+import 'profile_photo.dart';
 
 /// Thrown for any handled auth failure (wrong password, account blocked,
 /// email already registered, etc.) so screens can show `.message` directly.
@@ -61,28 +62,67 @@ class AuthService {
   /// regardless of what role is sent (ADMIN accounts are created by an
   /// existing Admin, not through this screen).
   Future<UserModel> register({
+    ProfilePhoto? photo,
     required String fullName,
     required String email,
-    String? phone,
+    required String phone,
+    required String address,
+    required String city,
+    required String province,
     required String password,
     required String role, // 'CUSTOMER' or 'FARMER'
   }) async {
     try {
+      final fields = <String, dynamic>{
+        'fullName': fullName,
+        'email': email,
+        'phone': phone,
+        'address': address,
+        'city': city,
+        'province': province,
+        'password': password,
+        'role': role,
+      };
       final response = await _dio.post(
-        ApiConstants.register,
-        data: {
-          'fullName': fullName,
-          'email': email,
-          'phone': phone,
-          'password': password,
-          'role': role,
-        },
+        photo == null ? ApiConstants.register : '/auth/register-with-photo',
+        data: photo == null
+            ? fields
+            : FormData.fromMap({
+                ...fields,
+                'photo': MultipartFile.fromBytes(
+                  photo.bytes,
+                  filename: photo.name,
+                ),
+              }),
+        options: photo == null
+            ? null
+            : Options(contentType: 'multipart/form-data'),
       );
 
       return UserModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw AuthException(
         _extractMessage(e, fallback: 'Registration failed. Please try again.'),
+      );
+    }
+  }
+
+  Future<String> updateProfilePhoto(ProfilePhoto photo) async {
+    try {
+      final response = await _dio.put(
+        '/auth/profile-photo',
+        data: FormData.fromMap({
+          'photo': MultipartFile.fromBytes(photo.bytes, filename: photo.name),
+        }),
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return response.data['profileImageUrl'] as String;
+    } on DioException catch (e) {
+      throw AuthException(
+        _extractMessage(
+          e,
+          fallback: 'Could not update your photo. Please try again.',
+        ),
       );
     }
   }

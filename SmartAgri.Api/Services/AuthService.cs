@@ -51,7 +51,7 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<UserDto> RegisterAsync(RegisterDto dto)
+    public async Task<UserDto> RegisterAsync(RegisterDto dto, string? profileImageUrl = null)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
         {
@@ -67,7 +67,11 @@ public class AuthService : IAuthService
         {
             FullName = dto.FullName,
             Email = dto.Email,
-            Phone = dto.Phone,
+            ProfileImageUrl = profileImageUrl,
+            Phone = dto.Phone.Trim(),
+            Address = dto.Address.Trim(),
+            City = dto.City.Trim(),
+            Province = dto.Province.Trim(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = safeRole,
             Status = "ACTIVE",
@@ -113,7 +117,11 @@ public class AuthService : IAuthService
         Id = user.Id,
         FullName = user.FullName,
         Email = user.Email,
+        ProfileImageUrl = user.ProfileImageUrl,
         Phone = user.Phone,
+        Address = user.Address,
+        City = user.City,
+        Province = user.Province,
         Role = user.Role,
         Status = user.Status,
         CreatedAt = user.CreatedAt

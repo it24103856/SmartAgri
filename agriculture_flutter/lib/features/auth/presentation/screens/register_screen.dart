@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/profile_avatar.dart';
+import '../../data/services/profile_photo.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/sri_lanka_locations.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final Future<ProfilePhoto?> Function()? pickPhoto;
+  const RegisterScreen({super.key, this.pickPhoto});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -14,6 +18,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  String? _selectedCity;
+  String? _selectedProvince;
+  final _cityFieldKey = GlobalKey<FormFieldState<String>>();
+
+  ProfilePhoto? _photo;
+  bool _pickingPhoto = false;
   bool _isObscured = true;
   bool _isLoading = false;
   String _selectedRole = 'CUSTOMER'; // default; user can switch to FARMER
@@ -23,7 +35,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    setState(() => _pickingPhoto = true);
+    try {
+      final photo = await (widget.pickPhoto ?? ProfilePhoto.pick)();
+      if (mounted && photo != null) setState(() => _photo = photo);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AuthException
+                  ? error.message
+                  : 'Could not select your photo. Please try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -33,10 +69,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       await AuthService.instance.register(
+        photo: _photo,
         fullName: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
         role: _selectedRole,
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        city: _selectedCity!,
+        province: _selectedProvince!,
       );
 
       if (!mounted) return;
@@ -58,6 +99,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  InputDecoration _locationDecoration(String label, IconData icon) =>
+      InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.primaryContainer,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
+      );
+
   Widget _roleChip(String role, IconData icon, String label) {
     final isSelected = _selectedRole == role;
     return Expanded(
@@ -67,21 +120,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF3B6E52)
-                : const Color(0xFFE2EBE5),
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(15),
           ),
           child: Column(
             children: [
               Icon(
                 icon,
-                color: isSelected ? Colors.white : const Color(0xFF2D4B3E),
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface,
               ),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF2D4B3E),
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),
@@ -96,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
@@ -108,32 +165,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: CircleAvatar(
-                    backgroundColor: const Color(0xFFE2EBE5),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
                     child: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.arrow_back,
-                        color: Color(0xFF2D4B3E),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   "Register",
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D4B3E),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 5),
-                const Text(
+                Text(
                   "Create your new account",
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 25),
 
+                ProfileAvatar(bytes: _photo?.bytes, radius: 44),
+                TextButton.icon(
+                  onPressed: _isLoading || _pickingPhoto ? null : _pickPhoto,
+                  icon: const Icon(Icons.add_a_photo_outlined),
+                  label: Text(
+                    _pickingPhoto
+                        ? 'Opening photos...'
+                        : _photo == null
+                        ? 'Add profile photo (optional)'
+                        : 'Change photo',
+                  ),
+                ),
+                if (_photo != null)
+                  TextButton(
+                    onPressed: _isLoading || _pickingPhoto
+                        ? null
+                        : () => setState(() => _photo = null),
+                    child: const Text('Remove photo'),
+                  ),
+                const SizedBox(height: 15),
                 // I am a... role selector
                 Align(
                   alignment: Alignment.centerLeft,
@@ -141,7 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     "I am a...",
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -168,12 +250,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       : null,
                   decoration: InputDecoration(
                     hintText: "Full Name",
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.person_outline,
-                      color: Color(0xFF2D4B3E),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFE2EBE5),
+                    fillColor: Theme.of(context).colorScheme.primaryContainer,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
                       borderSide: BorderSide.none,
@@ -187,23 +269,150 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty)
+                    if (value == null || value.trim().isEmpty) {
                       return 'Email is required';
+                    }
                     if (!value.contains('@')) return 'Enter a valid email';
                     return null;
                   },
                   decoration: InputDecoration(
                     hintText: "user@mail.com",
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.email_outlined,
-                      color: Color(0xFF2D4B3E),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFE2EBE5),
+                    fillColor: Theme.of(context).colorScheme.primaryContainer,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
                       borderSide: BorderSide.none,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                TextFormField(
+                  key: const ValueKey('phone'),
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  maxLength: 25,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Telephone number is required';
+                    }
+                    if (!RegExp(
+                      r'^\+?[0-9][0-9 ()-]{5,23}[0-9]$',
+                    ).hasMatch(value.trim())) {
+                      return 'Enter a valid telephone number';
+                    }
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Telephone number',
+                    prefixIcon: Icon(
+                      Icons.phone_outlined,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.primaryContainer,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                TextFormField(
+                  key: const ValueKey('address'),
+                  controller: _addressController,
+                  keyboardType: TextInputType.streetAddress,
+                  textInputAction: TextInputAction.next,
+                  maxLength: 250,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Address is required';
+                    }
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Address',
+                    prefixIcon: Icon(
+                      Icons.home_outlined,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.primaryContainer,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('province'),
+                  initialValue: _selectedProvince,
+                  isExpanded: true,
+                  menuMaxHeight: 320,
+                  hint: const Text('Select province'),
+                  items: sriLankaCitiesByProvince.keys
+                      .map(
+                        (province) => DropdownMenuItem(
+                          value: province,
+                          child: Text(province),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (province) {
+                    if (province == _selectedProvince) return;
+                    _cityFieldKey.currentState?.didChange(null);
+                    setState(() {
+                      _selectedProvince = province;
+                      _selectedCity = null;
+                    });
+                  },
+                  validator: (value) =>
+                      value == null ? 'Province is required' : null,
+                  decoration: _locationDecoration(
+                    'Province',
+                    Icons.map_outlined,
+                  ),
+                ),
+                const SizedBox(height: 15),
+                DropdownButtonFormField<String>(
+                  key: _cityFieldKey,
+                  initialValue: _selectedCity,
+                  isExpanded: true,
+                  menuMaxHeight: 320,
+                  hint: Text(
+                    _selectedProvince == null
+                        ? 'Select province first'
+                        : 'Select city',
+                  ),
+                  items:
+                      (sriLankaCitiesByProvince[_selectedProvince] ??
+                              <String>[])
+                          .map(
+                            (city) => DropdownMenuItem(
+                              value: city,
+                              child: Text(
+                                city,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: _selectedProvince == null
+                      ? null
+                      : (city) => setState(() => _selectedCity = city),
+                  validator: (value) =>
+                      value == null ? 'City is required' : null,
+                  decoration: _locationDecoration(
+                    'City',
+                    Icons.location_city_outlined,
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -213,30 +422,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _passwordController,
                   obscureText: _isObscured,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'Password is required';
-                    if (value.length < 6)
+                    }
+                    if (value.length < 6) {
                       return 'Password must be at least 6 characters';
+                    }
                     return null;
                   },
                   decoration: InputDecoration(
                     hintText: "••••••••",
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.lock_outline,
-                      color: Color(0xFF2D4B3E),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _isObscured
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
-                        color: const Color(0xFF2D4B3E),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       onPressed: () =>
                           setState(() => _isObscured = !_isObscured),
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFE2EBE5),
+                    fillColor: Theme.of(context).colorScheme.primaryContainer,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
                       borderSide: BorderSide.none,
@@ -251,26 +462,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   height: 52,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B6E52),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
                       ),
                     ),
-                    onPressed: _isLoading ? null : _handleRegister,
+                    onPressed: _isLoading || _pickingPhoto
+                        ? null
+                        : _handleRegister,
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               strokeWidth: 2.5,
                             ),
                           )
-                        : const Text(
+                        : Text(
                             "Register",
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -281,16 +495,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       "Already have an account? ",
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         "Sign in",
                         style: TextStyle(
-                          color: Color(0xFF3B6E52),
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

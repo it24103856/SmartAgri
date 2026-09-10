@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         clipper: WaveClipper(),
                         child: Container(
                           height: 70,
-                          color: const Color(0xFFF7F9F8),
+                          color: Theme.of(context).scaffoldBackgroundColor,
                         ),
                       ),
                     ),
@@ -111,9 +111,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: CircleAvatar(
                         backgroundColor: Colors.white.withValues(alpha: 0.8),
                         child: IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back,
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                           onPressed: () => Navigator.pop(context),
                         ),
@@ -129,18 +129,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       "Welcome Back",
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D4B3E),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 5),
-                    const Text(
+                    Text(
                       "Login to your account",
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 25),
 
@@ -159,12 +162,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: "user@mail.com",
-                        prefixIcon: const Icon(
+                        prefixIcon: Icon(
                           Icons.email_outlined,
-                          color: Color(0xFF2D4B3E),
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFE2EBE5),
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(15),
                           borderSide: BorderSide.none,
@@ -185,22 +190,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: "••••••••",
-                        prefixIcon: const Icon(
+                        prefixIcon: Icon(
                           Icons.lock_outline,
-                          color: Color(0xFF2D4B3E),
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: const Color(0xFF2D4B3E),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                           onPressed: () =>
                               setState(() => _isObscured = !_isObscured),
                         ),
                         filled: true,
-                        fillColor: const Color(0xFFE2EBE5),
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(15),
                           borderSide: BorderSide.none,
@@ -216,26 +223,30 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Checkbox(
                               value: _rememberMe,
-                              activeColor: const Color(0xFF3B6E52),
+                              activeColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               onChanged: (value) =>
                                   setState(() => _rememberMe = value ?? false),
                             ),
-                            const Text(
+                            Text(
                               "Remember Me",
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
                         GestureDetector(
                           onTap: () {},
-                          child: const Text(
+                          child: Text(
                             "Forgot Password ?",
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.black87,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -250,26 +261,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 52,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3B6E52),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
                         onPressed: _isLoading ? null : _handleLogin,
                         child: _isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 22,
                                 width: 22,
                                 child: CircularProgressIndicator(
-                                  color: Colors.white,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimary,
                                   strokeWidth: 2.5,
                                 ),
                               )
-                            : const Text(
+                            : Text(
                                 "Login",
                                 style: TextStyle(
                                   fontSize: 18,
-                                  color: Colors.white,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -280,9 +300,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           "Don't have account? ",
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                         GestureDetector(
                           onTap: () {
@@ -293,10 +317,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             );
                           },
-                          child: const Text(
+                          child: Text(
                             "Sign up",
                             style: TextStyle(
-                              color: Color(0xFF3B6E52),
+                              color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

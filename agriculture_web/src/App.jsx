@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import Sidebar from './components/layout/Sidebar';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Login from './pages/Auth/Login';
-    import UserManagement from './pages/Users/UserManagement';
+import UserManagement from './pages/Users/UserManagement';
+import CategoryManagement from './pages/Categories/CategoryManagement';
+import ProductManagement from './pages/Products/ProductManagement';
 
 
 function App() {
@@ -31,7 +33,9 @@ function App() {
       
       <main className="flex-1 bg-[#F4F7F4] p-8 overflow-y-auto">
         {activeTab === 'dashboard' && <Dashboard />}
-              {activeTab === 'users' && <UserManagement />}
+        {activeTab === 'users' && <UserManagement />}
+        {activeTab === 'categories' && <CategoryManagement />}
+        {activeTab === 'products' && <ProductManagement />}
 
         {activeTab !== 'dashboard' && (
           <div className="p-4">

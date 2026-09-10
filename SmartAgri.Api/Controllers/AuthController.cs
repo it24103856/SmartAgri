@@ -1,3 +1,7 @@
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using SmartAgri.Api.Data;
+using SmartAgri.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartAgri.Api.DTOs;
@@ -32,6 +36,56 @@ public class AuthController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    [HttpPost("register-with-photo")]
+    [AllowAnonymous]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<ActionResult<UserDto>> RegisterWithPhoto(
+        [FromForm] RegisterWithPhotoDto dto, [FromServices] ProfileImageStore images)
+    {
+        var urls = dto.Photo is null ? new List<string>() : await images.SaveAsync(new[] { dto.Photo });
+        try
+        {
+            var user = await _authService.RegisterAsync(dto, urls.FirstOrDefault());
+            return CreatedAtAction(nameof(Register), new { id = user.Id }, user);
+        }
+        catch
+        {
+            images.DeleteFiles(urls);
+            throw;
+        }
+    }
+
+    [HttpPut("profile-photo")]
+    [Authorize]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<IActionResult> UpdateProfilePhoto(
+        [FromForm] ProfilePhotoDto dto,
+        [FromServices] ApplicationDbContext db,
+        [FromServices] ProfileImageStore images)
+    {
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id)) return Unauthorized();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null) return Unauthorized();
+        if (user.Status != "ACTIVE") return Forbid();
+        var urls = await images.SaveAsync(new[] { dto.Photo });
+        var oldUrl = user.ProfileImageUrl;
+        try
+        {
+            user.ProfileImageUrl = urls[0];
+            user.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            images.DeleteFiles(urls);
+            throw;
+        }
+        if (oldUrl is not null) images.DeleteFiles(new[] { oldUrl });
+        return Ok(new { profileImageUrl = user.ProfileImageUrl });
     }
 
     // POST: api/auth/login

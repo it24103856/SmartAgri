@@ -8,12 +8,19 @@ using SmartAgri.Api.Data;
 using SmartAgri.Api.Interfaces;
 using SmartAgri.Api.Middleware;
 using SmartAgri.Api.Services;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Add Services to DI Container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddSingleton<ProductImageStore>();
+builder.Services.AddSingleton<CategoryImageStore>();
+builder.Services.AddSingleton<ProfileImageStore>();
 
 // 2. Swagger Configuration with JWT Authorize Button
 builder.Services.AddSwaggerGen(options =>
@@ -53,6 +60,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // 4. Register Custom Services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 // 5. CORS Setup
 builder.Services.AddCors(options =>
@@ -104,8 +112,41 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseCors("AllowAll");
+var productImageStore =
+    app.Services.GetRequiredService<ProductImageStore>();
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        productImageStore.RootDirectory),
+
+    RequestPath = "/uploads/products",
+
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers["X-Content-Type-Options"] =
+            "nosniff";
+    }
+});
+
+var categoryImageStore = app.Services.GetRequiredService<CategoryImageStore>();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(categoryImageStore.RootDirectory),
+    RequestPath = "/uploads/categories",
+    OnPrepareResponse = context =>
+        context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
 
 // IMPORTANT: UseAuthentication must come BEFORE UseAuthorization.
+var profileImageStore = app.Services.GetRequiredService<ProfileImageStore>();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(profileImageStore.RootDirectory),
+    RequestPath = "/uploads/profiles",
+    OnPrepareResponse = context => context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
