@@ -14,11 +14,43 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<Product> Products { get; set; }
-
+    public DbSet<Cart> Carts { get; set; }
+    public DbSet<CartItem> CartItems { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+modelBuilder.Entity<Cart>(entity =>
+{
+    entity.HasIndex(c => c.UserId)
+        .IsUnique();
 
+    entity.HasOne<User>()
+        .WithMany()
+        .HasForeignKey(c => c.UserId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
+
+modelBuilder.Entity<CartItem>(entity =>
+{
+    entity.HasIndex(i => new
+    {
+        i.CartId,
+        i.ProductId
+    }).IsUnique();
+
+    entity.Property(i => i.UnitPrice)
+        .HasPrecision(18, 2);
+
+    entity.HasOne<Cart>()
+        .WithMany()
+        .HasForeignKey(i => i.CartId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasOne<Product>()
+        .WithMany()
+        .HasForeignKey(i => i.ProductId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
         modelBuilder.Entity<Category>(entity =>
         {
             entity.Property(c => c.Name)

@@ -77,7 +77,7 @@ class CatalogService {
         (data) => CatalogPage.fromJson(Map<String, dynamic>.from(data as Map)),
         {
           if (search.trim().isNotEmpty) 'search': search.trim(),
-          if (categoryId != null) 'categoryId': categoryId,
+          'categoryId': ?categoryId,
           'sort': sort,
           'page': page,
           'pageSize': pageSize,

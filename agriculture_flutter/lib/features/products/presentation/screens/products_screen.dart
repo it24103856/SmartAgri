@@ -96,53 +96,144 @@ class _ProductsScreenState extends State<ProductsScreen> {
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // UI HELPERS (purely visual — no logic changes)
+  // ---------------------------------------------------------------------------
+
   Widget _filterBox(Widget child) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: child,
     );
   }
 
-  Widget _filters(List<CatalogCategory> categories) {
-    return Column(
+  Widget _sectionHeading(String title, {String? trailing}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
       children: [
-        TextField(
-          controller: _search,
-          maxLength: 100,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: 'Search products...',
-            counterText: '',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: IconButton(
-              tooltip: 'Clear search',
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                _search.clear();
-                _load();
-              },
+        Container(
+          width: 4,
+          height: 22,
+          decoration: BoxDecoration(
+            color: scheme.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+        ),
+        if (trailing != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              trailing,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: scheme.primary,
+              ),
             ),
           ),
-          onSubmitted: (_) => _load(),
-          onChanged: (_) {
-            _debounce?.cancel();
+      ],
+    );
+  }
 
-            _debounce = Timer(const Duration(milliseconds: 450), () {
-              if (mounted) _load();
-            });
-          },
+  Widget _filters(List<CatalogCategory> categories) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        // Floating pill search bar — same style as home page
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.primary.withValues(alpha: 0.12),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: _search,
+            maxLength: 100,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search fresh products...',
+              counterText: '',
+              filled: true,
+              fillColor: scheme.surface,
+              prefixIcon: Icon(Icons.search_rounded, color: scheme.primary),
+              suffixIcon: Padding(
+                padding: const EdgeInsets.all(6),
+                child: IconButton.filled(
+                  tooltip: 'Clear search',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    _search.clear();
+                    _load();
+                  },
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(color: scheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(color: scheme.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide(color: scheme.primary, width: 1.6),
+              ),
+            ),
+            onSubmitted: (_) => _load(),
+            onChanged: (_) {
+              _debounce?.cancel();
+
+              _debounce = Timer(const Duration(milliseconds: 450), () {
+                if (mounted) _load();
+              });
+            },
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _filterBox(
           DropdownButton<int>(
             value: _category,
             isExpanded: true,
             underline: const SizedBox.shrink(),
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: scheme.primary,
+            ),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
+            ),
             items: [
               const DropdownMenuItem(value: 0, child: Text('All categories')),
               if (_category != 0 && !categories.any((c) => c.id == _category))
@@ -174,6 +265,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
             value: _sort,
             isExpanded: true,
             underline: const SizedBox.shrink(),
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: scheme.primary,
+            ),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
+            ),
             items: const [
               DropdownMenuItem(value: 'latest', child: Text('Newest first')),
               DropdownMenuItem(
@@ -197,12 +296,137 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
+  Widget _pagination(CatalogPage page) {
+    final scheme = Theme.of(context).colorScheme;
+
+    Widget pageButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onPressed,
+    }) {
+      return Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: onPressed == null
+              ? null
+              : [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.30),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+        ),
+        child: IconButton.filled(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          icon: Icon(icon, size: 22),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          pageButton(
+            icon: Icons.chevron_left_rounded,
+            tooltip: 'Previous page',
+            onPressed: page.page > 1 ? () => _goToPage(page.page - 1) : null,
+          ),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Page ${page.page} of ${page.totalPages}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.primary,
+                ),
+              ),
+            ),
+          ),
+          pageButton(
+            icon: Icons.chevron_right_rounded,
+            tooltip: 'Next page',
+            onPressed: page.page < page.totalPages
+                ? () => _goToPage(page.page + 1)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Explore products'),
-        actions: [TextButton(onPressed: _reset, child: const Text('Reset'))],
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [scheme.primary, scheme.tertiary],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.grid_view_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Explore products',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              onPressed: _reset,
+              icon: const Icon(Icons.restart_alt_rounded, size: 18),
+              label: const Text('Reset'),
+              style: TextButton.styleFrom(foregroundColor: scheme.primary),
+            ),
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -234,12 +458,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         onRetry: () => _load(page: _page),
                       )
                     else if (data != null) ...[
-                      Text(
-                        '${data.products.totalCount} products',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      _sectionHeading(
+                        'Products',
+                        trailing: '${data.products.totalCount} items',
                       ),
                       const SizedBox(height: 16),
                       if (data.products.items.isEmpty)
@@ -252,32 +473,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         CatalogGrid(products: data.products.items),
                       if (data.products.totalPages > 1) ...[
                         const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton.filledTonal(
-                              tooltip: 'Previous page',
-                              onPressed: data.products.page > 1
-                                  ? () => _goToPage(data.products.page - 1)
-                                  : null,
-                              icon: const Icon(Icons.chevron_left),
-                            ),
-                            Flexible(
-                              child: Text(
-                                'Page ${data.products.page} '
-                                'of ${data.products.totalPages}',
-                              ),
-                            ),
-                            IconButton.filledTonal(
-                              tooltip: 'Next page',
-                              onPressed:
-                                  data.products.page < data.products.totalPages
-                                  ? () => _goToPage(data.products.page + 1)
-                                  : null,
-                              icon: const Icon(Icons.chevron_right),
-                            ),
-                          ],
-                        ),
+                        _pagination(data.products),
                       ],
                     ],
                     const SizedBox(height: 20),
