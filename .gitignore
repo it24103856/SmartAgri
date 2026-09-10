@@ -1,0 +1,37 @@
+# ASP.NET Core build files
+**/bin/
+**/obj/
+
+# React dependencies and builds
+**/node_modules/
+**/dist/
+**/dist-ssr/
+
+# Flutter generated files
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Test output
+**/coverage/
+**/TestResults/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# IDE temporary files
+**/.vs/
+**/.idea/
+*.user
+*.suo
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
