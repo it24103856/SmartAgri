@@ -21,6 +21,30 @@ const ROLE_STYLES = {
 
 const PAGE_SIZE = 8;
 
+const UserAvatar = ({ user, large = false }) => {
+  const [failedUrl, setFailedUrl] = useState(null);
+  const imageUrl = user.profileImageUrl
+    ? new URL(user.profileImageUrl, new URL(api.defaults.baseURL, window.location.origin)).href
+    : null;
+  const initials = (user.fullName || '?').trim().split(/\s+/)
+    .slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase();
+
+  return (
+    <div className={`shrink-0 rounded-full overflow-hidden bg-[#EAF4EE] text-[#1E3A2B] flex items-center justify-center font-bold ${large ? 'h-16 w-16 text-xl' : 'h-10 w-10 text-sm'}`}>
+      {imageUrl && failedUrl !== imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={`${user.fullName || 'User'} profile`}
+          className="h-full w-full object-cover"
+          onError={() => setFailedUrl(imageUrl)}
+        />
+      ) : (
+        <span aria-label={`${user.fullName || 'User'} profile`}>{initials}</span>
+      )}
+    </div>
+  );
+};
+
 const ConfirmDialog = ({ title, message, confirmLabel, danger, onConfirm, onCancel }) => (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
     <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
@@ -60,11 +84,14 @@ const UserDetailModal = ({ user, onClose, onRoleChange, roleChanging }) => {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
         <div className="bg-[#1E3A2B] px-6 py-5 flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-3">
+            <UserAvatar user={user} large />
+            <div>
             <h3 className="text-white font-bold text-lg">{user.fullName}</h3>
             <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${ROLE_STYLES[user.role] || 'bg-white/20 text-white'}`}>
               {user.role}
             </span>
+            </div>
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white">
             <X size={20} />
@@ -367,7 +394,12 @@ const UserManagement = () => {
 
               {!loading && paged.map((u) => (
                 <tr key={u.id} onClick={() => setSelectedUser(u)} className="hover:bg-[#F4F7F4]/60 transition-colors cursor-pointer">
-                  <td className="px-6 py-4 font-semibold text-[#1E3A2B]">{u.fullName}</td>
+                  <td className="px-6 py-4 font-semibold text-[#1E3A2B]">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar user={u} />
+                      <span>{u.fullName}</span>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-gray-500">{u.email}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${ROLE_STYLES[u.role] || ''}`}>

@@ -242,7 +242,6 @@ SmartAgri/
 ```
 
 ## Running each application
-
 ### Flutter mobile app
 
 ```bash
@@ -269,3 +268,7 @@ dotnet run
 
 Each application has its own dependencies, configuration, and build process. The
 Flutter and React clients communicate with `SmartAgri.Api` through HTTP APIs.
+
+
+after clone 
+
