@@ -9,6 +9,7 @@ using SmartAgri.Api.Interfaces;
 using SmartAgri.Api.Middleware;
 using SmartAgri.Api.Services;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +99,9 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<CustomerCheckoutService>();
 
 var app = builder.Build();
 

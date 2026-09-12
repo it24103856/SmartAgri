@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/widgets/catalog_widgets.dart';
+import '../../../../shared/widgets/customer_animated_nav_bar.dart';
 import '../../../../shared/widgets/theme_toggle_button.dart';
 import '../../../products/data/models/catalog_models.dart';
 import '../../../products/data/services/catalog_service.dart';
@@ -53,12 +54,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Future<void> _openProducts({int? categoryId, String search = ''}) async {
+    final navigation = CustomerNavigation.maybeOf(context);
+
+    if (navigation != null) {
+      navigation.openProducts(categoryId, search);
+      return;
+    }
+
+    // Also supports opening this screen outside CustomerShell.
     if (_openingProducts) return;
 
     _openingProducts = true;
 
     try {
-      await Navigator.of(context).push(
+      await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ProductsScreen(
             initialCategoryId: categoryId,
@@ -563,6 +572,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         IconButton(
                           tooltip: 'My cart',
                           onPressed: () {
+                            final navigation = CustomerNavigation.maybeOf(
+                              context,
+                            );
+
+                            if (navigation != null) {
+                              navigation.selectTab(2);
+                              return;
+                            }
+
                             Navigator.of(context).push<void>(
                               MaterialPageRoute<void>(
                                 builder: (_) => const CartScreen(),
@@ -699,24 +717,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             },
           ),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (index) {
-          if (index == 1) _openProducts();
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'Products',
-          ),
-        ],
       ),
     );
   }

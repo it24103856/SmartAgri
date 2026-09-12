@@ -8,6 +8,7 @@ import '../../data/models/catalog_models.dart';
 import '../../data/services/catalog_service.dart';
 import '../../../cart/presentation/cart_screen.dart';
 import '../../../cart/presentation/product_purchase_actions.dart';
+import '../../../../shared/widgets/app_entrance.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final int productId;
@@ -360,7 +361,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           _stockBanner(product),
 
           const SizedBox(height: 26),
-          ProductPurchaseActions(product: product),
+          AppEntrance(
+            key: ValueKey(product.id),
+            child: ProductPurchaseActions(product: product),
+          ),
           const SizedBox(height: 28),
 
           // Description

@@ -21,9 +21,12 @@ public class ExceptionMiddleware
             await _next(context);
         }
         catch (BadHttpRequestException ex)
-        {
-            await HandleExceptionAsync(context, HttpStatusCode.BadRequest, ex.Message);
-        }
+{
+    await HandleExceptionAsync(
+        context,
+        (HttpStatusCode)ex.StatusCode,
+        ex.Message);
+}
         catch (UnauthorizedAccessException ex)
         {
             await HandleExceptionAsync(context, HttpStatusCode.Forbidden, ex.Message);

@@ -129,9 +129,7 @@ class _ProductPurchaseActionsState extends State<ProductPurchaseActions> {
   Future<void> _buyNow() async {
     if (_busy || !widget.product.inStock) return;
 
-    setState(() {
-      _busy = true;
-    });
+    setState(() => _busy = true);
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -141,9 +139,7 @@ class _ProductPurchaseActionsState extends State<ProductPurchaseActions> {
     );
 
     if (mounted) {
-      setState(() {
-        _busy = false;
-      });
+      setState(() => _busy = false);
     }
   }
 

@@ -1,0 +1,39 @@
+import 'package:flutter/material.dart';
+
+class AppEntrance extends StatelessWidget {
+  final Widget child;
+
+  const AppEntrance({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(
+        begin: 0,
+        end: 1,
+      ),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(
+              0,
+              16 * (1 - value),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}

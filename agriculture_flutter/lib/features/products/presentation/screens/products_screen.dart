@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../shared/widgets/catalog_widgets.dart';
 import '../../data/models/catalog_models.dart';
 import '../../data/services/catalog_service.dart';
@@ -483,24 +482,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
             },
           ),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 1,
-        onDestinationSelected: (index) {
-          if (index == 0) Navigator.pop(context);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'Products',
-          ),
-        ],
       ),
     );
   }

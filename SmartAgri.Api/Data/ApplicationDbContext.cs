@@ -16,9 +16,18 @@ public class ApplicationDbContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<Cart> Carts { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
+
+   public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
+
+public DbSet<CustomerOrderLine> CustomerOrderLines =>
+    Set<CustomerOrderLine>();
+
+public DbSet<CustomerPayment> CustomerPayments =>
+    Set<CustomerPayment>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        
 modelBuilder.Entity<Cart>(entity =>
 {
     entity.HasIndex(c => c.UserId)
@@ -29,7 +38,32 @@ modelBuilder.Entity<Cart>(entity =>
         .HasForeignKey(c => c.UserId)
         .OnDelete(DeleteBehavior.Cascade);
 });
+modelBuilder.Entity<CustomerOrder>(entity =>
+{
+    entity.HasIndex(o => new { o.UserId, o.RequestId })
+        .IsUnique();
 
+    entity.HasOne<User>()
+        .WithMany()
+        .HasForeignKey(o => o.UserId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasMany(o => o.Items)
+        .WithOne()
+        .HasForeignKey(i => i.OrderId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasOne(o => o.Payment)
+        .WithOne()
+        .HasForeignKey<CustomerPayment>(p => p.OrderId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
+
+modelBuilder.Entity<CustomerPayment>(entity =>
+{
+    entity.HasIndex(p => p.GatewayOrderId)
+        .IsUnique();
+});
 modelBuilder.Entity<CartItem>(entity =>
 {
     entity.HasIndex(i => new

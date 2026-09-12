@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../products/presentation/screens/customer_home_screen.dart';
+import '../../../customer/presentation/customer_shell.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 
@@ -24,7 +24,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (role.toUpperCase() == 'CUSTOMER') {
-      return CustomerHomeScreen(fullName: fullName);
+      return CustomerShell(fullName: fullName);
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9F8),
