@@ -38,10 +38,10 @@ class CustomerAnimatedNavBar extends StatelessWidget {
     Icons.home_outlined,
     Icons.grid_view_rounded,
     Icons.shopping_cart_outlined,
-    Icons.receipt_long_outlined,
+    Icons.person_outline_rounded,
   ];
 
-  static const _labels = ['Home', 'Products', 'Cart', 'Orders'];
+  static const _labels = ['Home', 'Products', 'Cart', 'Profile'];
 
   @override
   Widget build(BuildContext context) {

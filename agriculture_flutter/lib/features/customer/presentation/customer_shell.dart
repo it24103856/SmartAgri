@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/widgets/customer_animated_nav_bar.dart';
 import '../../cart/presentation/cart_screen.dart';
-import '../../orders/presentation/purchase_order_screen.dart';
+import '../../auth/data/models/user_model.dart';
+import '../../profile/data/customer_profile_service.dart';
+import '../../profile/presentation/customer_profile_screen.dart';
 import '../../products/presentation/screens/customer_home_screen.dart';
 import '../../products/presentation/screens/products_screen.dart';
 
@@ -26,6 +28,27 @@ class _CustomerShellState extends State<CustomerShell> {
 
     // Other tabs are created when first opened.
     _pages = [CustomerHomeScreen(fullName: widget.fullName), null, null, null];
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final user = await CustomerProfileService.instance.load();
+      _profileUpdated(user);
+    } catch (_) {
+      // Keep the home page and default account icon available when offline.
+    }
+  }
+
+  void _profileUpdated(UserModel user) {
+    if (!mounted) return;
+
+    setState(() {
+      _pages[0] = CustomerHomeScreen(
+        fullName: user.fullName,
+        profileImageUrl: user.profileImageUrl,
+      );
+    });
   }
 
   void _selectTab(int index) {
@@ -41,8 +64,10 @@ class _CustomerShellState extends State<CustomerShell> {
         // Reload cart data whenever the customer enters this tab.
         _pages[2] = CartScreen(key: UniqueKey());
       } else if (index == 3) {
-        // Reload orders whenever the customer enters this tab.
-        _pages[3] = PurchaseHistoryScreen(key: UniqueKey());
+        _pages[3] = CustomerProfileScreen(
+          key: UniqueKey(),
+          onUpdated: _profileUpdated,
+        );
       }
 
       _selectedIndex = index;

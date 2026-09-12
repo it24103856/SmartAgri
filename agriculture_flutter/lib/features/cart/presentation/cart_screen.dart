@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/widgets/catalog_common.dart';
-import '../../../shared/widgets/customer_animated_nav_bar.dart';
 import '../../orders/presentation/checkout_screen.dart';
 import '../../orders/presentation/purchase_order_screen.dart';
 import '../../products/data/services/catalog_service.dart';
@@ -89,13 +88,6 @@ class _CartScreenState extends State<CartScreen> {
             tooltip: 'My Orders',
             icon: const Icon(Icons.receipt_long_outlined),
             onPressed: () {
-              final navigation = CustomerNavigation.maybeOf(context);
-
-              if (navigation != null) {
-                navigation.selectTab(3);
-                return;
-              }
-
               Navigator.of(context).push<void>(
                 MaterialPageRoute<void>(
                   builder: (_) => const PurchaseHistoryScreen(),

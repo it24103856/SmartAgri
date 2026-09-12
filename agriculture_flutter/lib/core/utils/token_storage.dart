@@ -25,6 +25,14 @@ class TokenStorage {
     await _storage.write(key: _emailKey, value: email);
   }
 
+  Future<void> updateIdentity({
+    required String fullName,
+    required String email,
+  }) async {
+    await _storage.write(key: _nameKey, value: fullName);
+    await _storage.write(key: _emailKey, value: email);
+  }
+
   Future<String?> getToken() => _storage.read(key: _tokenKey);
   Future<String?> getRole() => _storage.read(key: _roleKey);
   Future<String?> getFullName() => _storage.read(key: _nameKey);

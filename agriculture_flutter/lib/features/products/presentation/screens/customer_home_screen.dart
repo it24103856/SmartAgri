@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../shared/widgets/catalog_widgets.dart';
 import '../../../../shared/widgets/customer_animated_nav_bar.dart';
 import '../../../../shared/widgets/theme_toggle_button.dart';
+import '../../../profile/presentation/customer_profile_screen.dart';
+import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../../products/data/models/catalog_models.dart';
 import '../../../products/data/services/catalog_service.dart';
 import '../../../products/presentation/screens/products_screen.dart';
@@ -11,8 +13,13 @@ import '../../../cart/data/cart_service.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   final String fullName;
+  final String? profileImageUrl;
 
-  const CustomerHomeScreen({super.key, required this.fullName});
+  const CustomerHomeScreen({
+    super.key,
+    required this.fullName,
+    this.profileImageUrl,
+  });
 
   @override
   State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
@@ -534,34 +541,22 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       scrolledUnderElevation: 2,
                       leading: Padding(
                         padding: const EdgeInsets.only(left: 12),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [scheme.primary, scheme.tertiary],
+                        child: Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.asset(
+                              'assets/images/logo.jpg',
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.contain,
+                              semanticLabel: 'SmartAgri logo',
                             ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: scheme.primary.withValues(alpha: 0.35),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.eco_rounded,
-                            color: Colors.white,
-                            size: 26,
                           ),
                         ),
                       ),
                       titleSpacing: 10,
                       title: const Text(
-                        'SmartAgri',
+                        '🌱 AgriLink',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 20,
@@ -600,28 +595,31 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           ),
                         ),
                         const ThemeToggleButton(),
-                        PopupMenuButton<String>(
-                          tooltip: 'Account',
-                          onSelected: (value) {
-                            if (value == 'logout') signOutCustomer(context);
+                        IconButton(
+                          tooltip: 'My Profile',
+                          icon:
+                              widget.profileImageUrl?.trim().isNotEmpty ?? false
+                              ? ProfileAvatar(
+                                  imageUrl: widget.profileImageUrl,
+                                  size: 36,
+                                )
+                              : const Icon(Icons.account_circle_outlined),
+                          onPressed: () {
+                            final navigation = CustomerNavigation.maybeOf(
+                              context,
+                            );
+
+                            if (navigation != null) {
+                              navigation.selectTab(3);
+                              return;
+                            }
+
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const CustomerProfileScreen(),
+                              ),
+                            );
                           },
-                          itemBuilder: (_) => [
-                            PopupMenuItem<String>(
-                              enabled: false,
-                              child: Text(name.isEmpty ? 'Customer' : name),
-                            ),
-                            const PopupMenuItem(
-                              value: 'logout',
-                              child: Text('Sign out'),
-                            ),
-                          ],
-                          icon: CircleAvatar(
-                            backgroundColor: scheme.primaryContainer,
-                            child: Icon(
-                              Icons.person_outline_rounded,
-                              color: scheme.primary,
-                            ),
-                          ),
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -633,7 +631,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Welcome back, $firstName 👋',
+                              'Hello , $firstName 👋',
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
