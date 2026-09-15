@@ -182,6 +182,8 @@ namespace SmartAgri.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Status", "CreatedAt");
+
                     b.HasIndex("UserId", "RequestId")
                         .IsUnique();
 
@@ -224,6 +226,49 @@ namespace SmartAgri.Api.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("CustomerOrderLines");
+                });
+
+            modelBuilder.Entity("SmartAgri.Api.Models.CustomerOrderStatusHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChangedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("PaymentCollected")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("OrderId", "CreatedAt");
+
+                    b.ToTable("CustomerOrderStatusHistories");
                 });
 
             modelBuilder.Entity("SmartAgri.Api.Models.CustomerPayment", b =>
@@ -461,6 +506,21 @@ namespace SmartAgri.Api.Migrations
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SmartAgri.Api.Models.CustomerOrderStatusHistory", b =>
+                {
+                    b.HasOne("SmartAgri.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartAgri.Api.Models.CustomerOrder", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

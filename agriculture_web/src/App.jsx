@@ -5,6 +5,7 @@ import Login from './pages/Auth/Login';
 import UserManagement from './pages/Users/UserManagement';
 import CategoryManagement from './pages/Categories/CategoryManagement';
 import ProductManagement from './pages/Products/ProductManagement';
+import OrderManagement from './pages/Orders/OrderManagement';
 
 
 function App() {
@@ -31,13 +32,15 @@ function App() {
         onLogout={handleLogout} 
       />
       
-      <main className="flex-1 bg-[#F4F7F4] p-8 overflow-y-auto">
+      <main className="min-w-0 flex-1 bg-[#F4F7F4] p-8 overflow-y-auto">
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'categories' && <CategoryManagement />}
         {activeTab === 'products' && <ProductManagement />}
+        {activeTab === 'orders' && <OrderManagement />}
+        
 
-        {activeTab !== 'dashboard' && (
+        {!['dashboard', 'users', 'categories', 'products', 'orders'].includes(activeTab) && (
           <div className="p-4">
             <h1 className="text-2xl font-bold text-[#1E3A2B] capitalize">{activeTab} Section</h1>
             <p className="mt-2 text-gray-500">Module component under development...</p>

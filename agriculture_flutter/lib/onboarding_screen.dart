@@ -1,6 +1,7 @@
 import 'package:agriculture_flutter/features/auth/presentation/screens/login_screen.dart';
 import 'package:agriculture_flutter/features/auth/presentation/screens/register_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 // ignore: unused_element
 class _LoginScreenPlaceholder extends StatelessWidget {
@@ -15,8 +16,84 @@ class _LoginScreenPlaceholder extends StatelessWidget {
   }
 }
 
-class OnboardingScreen extends StatelessWidget {
+class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
+
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with WidgetsBindingObserver {
+  final _video = VideoPlayerController.asset('assets/images/plants_bg.mp4');
+  bool _ready = false;
+  bool _foreground = true;
+  bool _openingPage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      await _video.initialize();
+      if (!mounted) return;
+      await _video.setVolume(0);
+      if (!mounted) return;
+      await _video.setLooping(true);
+      if (!mounted) return;
+      await _video.setPlaybackSpeed(0.25);
+      if (!mounted) return;
+      setState(() => _ready = true);
+      _syncPlayback();
+    } catch (error) {
+      debugPrint('Welcome video could not load: $error');
+    }
+  }
+
+  void _syncPlayback() {
+    if (!_ready) return;
+    if (_foreground &&
+        !_openingPage &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      _video.play();
+    } else {
+      _video.pause();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPlayback();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _syncPlayback();
+  }
+
+  Future<void> _openPage(Widget page) async {
+    _openingPage = true;
+    _syncPlayback();
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    if (!mounted) return;
+    _openingPage = false;
+    _syncPlayback();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _video.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +103,30 @@ class OnboardingScreen extends StatelessWidget {
           // 1. Background Image එක
           Positioned.fill(
             child: Image.asset(
+              errorBuilder: (_, error, stackTrace) =>
+                  const ColoredBox(color: Color(0xFF244D38)),
               'assets/images/plants_bg.jpg', // ඔබේ image path එක මෙතනට දෙන්න
               fit: BoxFit.cover, // screen එක පුරාම image එක fill වීමට
             ),
           ),
+
+          if (_ready && !MediaQuery.disableAnimationsOf(context))
+            Positioned.fill(
+              child: ExcludeSemantics(
+                child: IgnorePointer(
+                  child: ClipRect(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _video.value.size.width,
+                        height: _video.value.size.height,
+                        child: VideoPlayer(_video),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // 2. Lightweight panel that keeps the background image sharp.
           Center(
@@ -69,14 +166,7 @@ class OnboardingScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 55,
                     child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: () => _openPage(const LoginScreen()),
                       style: TextButton.styleFrom(
                         backgroundColor: Colors.white.withValues(alpha: 0.12),
                         side: const BorderSide(color: Colors.white),
@@ -97,14 +187,7 @@ class OnboardingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RegisterScreen(),
-                        ),
-                      );
-                    },
+                    onTap: () => _openPage(const RegisterScreen()),
                     child: const Text(
                       'Create an account',
                       style: TextStyle(

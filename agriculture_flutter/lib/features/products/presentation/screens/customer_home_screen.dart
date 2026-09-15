@@ -180,34 +180,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: featured == null
-                      ? null
-                      : () => showCatalogProduct(context, featured.id),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        height: 112,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: _homePhoto(featured?.thumbnail),
-                        ),
-                      ),
-                      if (featured != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            featured.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                    ],
+                  onTap: () => _openProducts(),
+                  child: Image.asset(
+                    'assets/images/fresh_baskets.png',
+                    height: 130,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Shop fresh produce',
                   ),
                 ),
               );

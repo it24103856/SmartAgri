@@ -75,7 +75,6 @@ public sealed class CatalogController : ControllerBase
 
         var categories = await _db.Categories
             .AsNoTracking()
-            .Where(c => c.Products.Any(p => p.Status == "APPROVED"))
             .OrderBy(c => c.Name)
             .Select(c => new
             {
@@ -85,15 +84,7 @@ public sealed class CatalogController : ControllerBase
                 ProductCount = c.Products.Count(
                     p => p.Status == "APPROVED"),
 
-                ImageUrl = c.Products
-                    .Where(p => p.Status == "APPROVED")
-                    .OrderByDescending(p => p.CreatedAt)
-                    .ThenByDescending(p => p.Id)
-                    .Select(p =>
-                        p.ImageUrls.Count > 0
-                            ? p.ImageUrls[0]
-                            : p.ImageUrl)
-                    .FirstOrDefault()
+                c.ImageUrl
             })
             .ToListAsync(ct);
 

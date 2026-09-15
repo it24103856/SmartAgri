@@ -51,9 +51,20 @@ class PurchaseOrder {
 
   bool get pending => paymentMethod == 'PAYHERE' && paymentStatus == 'Pending';
 
-  bool get paidAndConfirmed => paymentStatus == 'Paid' && status == 'Confirmed';
+  bool get isAcceptedOrder => const {
+    'Confirmed',
+    'Preparing',
+    'Packed',
+    'Dispatched',
+    'Delivered',
+  }.contains(status);
 
-  bool get codConfirmed => paymentMethod == 'COD' && status == 'Confirmed';
+  bool get paidAndConfirmed => paymentStatus == 'Paid' && isAcceptedOrder;
+
+  bool get codConfirmed =>
+      paymentMethod == 'COD' &&
+      paymentStatus == 'Unpaid' &&
+      isAcceptedOrder;
 }
 
 class PurchaseService {

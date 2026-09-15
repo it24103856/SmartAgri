@@ -19,6 +19,9 @@ public class ApplicationDbContext : DbContext
 
    public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
 
+    public DbSet<CustomerOrderStatusHistory> CustomerOrderStatusHistories =>
+        Set<CustomerOrderStatusHistory>();
+
 public DbSet<CustomerOrderLine> CustomerOrderLines =>
     Set<CustomerOrderLine>();
 
@@ -27,6 +30,35 @@ public DbSet<CustomerPayment> CustomerPayments =>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<CustomerOrderStatusHistory>(entity =>
+        {
+            entity.Property(h => h.FromStatus)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(h => h.ToStatus)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(h => h.Note)
+                .HasMaxLength(500);
+
+            entity.HasIndex(h => new { h.OrderId, h.CreatedAt });
+
+            entity.HasOne<CustomerOrder>()
+                .WithMany()
+                .HasForeignKey(h => h.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(h => h.ChangedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CustomerOrder>()
+            .HasIndex(o => new { o.Status, o.CreatedAt });
         
 modelBuilder.Entity<Cart>(entity =>
 {

@@ -102,6 +102,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddDataProtection();
 builder.Services.AddScoped<CustomerCheckoutService>();
+builder.Services.AddScoped<AdminOrderService>();
 
 var app = builder.Build();
 
