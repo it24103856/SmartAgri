@@ -80,170 +80,235 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Cart'),
-        actions: [
-          IconButton(
-            tooltip: 'My Orders',
-            icon: const Icon(Icons.receipt_long_outlined),
-            onPressed: () {
-              Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
-                  builder: (_) => const PurchaseHistoryScreen(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Refresh cart',
-            onPressed: _busy ? null : _reload,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: FutureBuilder<CartData>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
+    final colors = Theme.of(context).colorScheme;
+    return GlassCatalogBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          centerTitle: true,
+          title: const Text('My Cart'),
+          actions: [
+            IconButton(
+              tooltip: 'My Orders',
+              icon: const Icon(Icons.receipt_long_outlined),
+              onPressed: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PurchaseHistoryScreen(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              tooltip: 'Refresh cart',
+              onPressed: _busy ? null : _reload,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: FutureBuilder<CartData>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (snapshot.hasError) {
-              return CatalogMessage(error: snapshot.error, onRetry: _reload);
-            }
+              if (snapshot.hasError) {
+                return CatalogMessage(error: snapshot.error, onRetry: _reload);
+              }
 
-            final cart = snapshot.requireData;
+              final cart = snapshot.requireData;
 
-            if (cart.items.isEmpty) {
-              return const Center(child: Text('Your cart is empty.'));
-            }
+              if (cart.items.isEmpty) {
+                return const Center(child: Text('Your cart is empty.'));
+              }
 
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                if (_busy) const LinearProgressIndicator(),
-
-                for (final item in cart.items)
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              SizedBox(
-                                width: 64,
-                                height: 64,
-                                child: CatalogImage(item.imageUrl),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Rs. ${item.unitPrice.toStringAsFixed(2)}'
-                                      ' / ${item.unit}',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          if (!item.available)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 12),
-                              child: Text(
-                                'Unavailable or insufficient stock.',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              IconButton(
-                                onPressed: _busy || item.quantity <= 1
-                                    ? null
-                                    : () => _change(
-                                        () => CartService.instance.setQuantity(
-                                          item.productId,
-                                          item.quantity - 1,
-                                        ),
-                                      ),
-                                icon: const Icon(Icons.remove_circle_outline),
-                              ),
-                              Text('${item.quantity}'),
-                              IconButton(
-                                onPressed:
-                                    _busy ||
-                                        !item.available ||
-                                        item.quantity >= item.stockQuantity
-                                    ? null
-                                    : () => _change(
-                                        () => CartService.instance.setQuantity(
-                                          item.productId,
-                                          item.quantity + 1,
-                                        ),
-                                      ),
-                                icon: const Icon(Icons.add_circle_outline),
-                              ),
-                              TextButton.icon(
-                                onPressed: _busy
-                                    ? null
-                                    : () => _change(
-                                        () => CartService.instance.remove(
-                                          item.productId,
-                                        ),
-                                      ),
-                                icon: const Icon(Icons.delete_outline),
-                                label: const Text('Remove'),
-                              ),
-                            ],
-                          ),
-
-                          Text(
-                            'Rs. ${item.lineTotal.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  if (_busy) const LinearProgressIndicator(),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Text(
+                      '${cart.items.length} items in your basket',
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
 
-                const SizedBox(height: 16),
+                  for (final item in cart.items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: GlassCatalogCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 78,
+                                  height: 78,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: CatalogImage(item.imageUrl),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Rs. ${item.unitPrice.toStringAsFixed(2)}'
+                                        ' / ${item.unit}',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
 
-                Text(
-                  'Subtotal: Rs. ${cart.subtotal.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
+                            if (!item.available)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 12),
+                                child: Text(
+                                  'Unavailable or insufficient stock.',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                IconButton(
+                                  onPressed: _busy || item.quantity <= 1
+                                      ? null
+                                      : () => _change(
+                                          () =>
+                                              CartService.instance.setQuantity(
+                                                item.productId,
+                                                item.quantity - 1,
+                                              ),
+                                        ),
+                                  icon: const Icon(Icons.remove_rounded),
+                                ),
+                                Text('${item.quantity}'),
+                                IconButton(
+                                  onPressed:
+                                      _busy ||
+                                          !item.available ||
+                                          item.quantity >= item.stockQuantity
+                                      ? null
+                                      : () => _change(
+                                          () =>
+                                              CartService.instance.setQuantity(
+                                                item.productId,
+                                                item.quantity + 1,
+                                              ),
+                                        ),
+                                  icon: const Icon(Icons.add_rounded),
+                                ),
+                                TextButton.icon(
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _change(
+                                          () => CartService.instance.remove(
+                                            item.productId,
+                                          ),
+                                        ),
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('Remove'),
+                                ),
+                              ],
+                            ),
+
+                            Text(
+                              'Rs. ${item.lineTotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  GlassCatalogCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Order summary',
+                          style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          spacing: 20,
+                          runSpacing: 8,
+                          children: [
+                            Text(
+                              'Subtotal',
+                              style: TextStyle(color: colors.onSurfaceVariant),
+                            ),
+                            Text(
+                              'Rs. ${cart.subtotal.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: colors.onSurface,
+                                fontSize: 23,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Review delivery and payment at checkout.',
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        FilledButton.icon(
+                          onPressed: _busy || !cart.canCheckout
+                              ? null
+                              : _checkout,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                            elevation: 4,
+                            shadowColor: colors.primary.withValues(alpha: 0.25),
+                            shape: const StadiumBorder(),
+                          ),
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                          label: const Text('Proceed to checkout'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                FilledButton(
-                  onPressed: _busy || !cart.canCheckout ? null : _checkout,
-                  child: const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Text('Proceed to checkout'),
-                  ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

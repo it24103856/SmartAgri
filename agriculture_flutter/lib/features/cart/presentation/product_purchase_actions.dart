@@ -146,64 +146,161 @@ class _ProductPurchaseActionsState extends State<ProductPurchaseActions> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final colors = Theme.of(context).colorScheme;
+
     final enabled = !_busy && product.inStock;
+
+    final canAdd = enabled && _inCart + _quantity <= product.stockQuantity;
+
+    final displayedQuantity = product.inStock ? _quantity : 0;
+
+    final total = product.price * displayedQuantity;
+
+    final addButton = OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colors.primary,
+        backgroundColor: colors.surface.withValues(alpha: 0.72),
+        side: BorderSide(color: colors.primary.withValues(alpha: 0.32)),
+        minimumSize: const Size(0, 54),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      onPressed: canAdd ? _add : null,
+      icon: const Icon(Icons.add_shopping_cart_rounded, size: 19),
+      label: Text(
+        product.inStock && _inCart >= product.stockQuantity
+            ? 'Already in cart'
+            : 'Add to Cart',
+      ),
+    );
+
+    final buyButton = FilledButton.icon(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 54),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      onPressed: enabled ? _buyNow : null,
+      icon: const Icon(Icons.arrow_forward_rounded, size: 19),
+      label: const Text('Buy Now'),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 24),
+        const SizedBox(height: 6),
 
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
+        Row(
           children: [
-            const Text(
+            Text(
               'Quantity',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: colors.onPrimaryContainer,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-
-            IconButton(
-              tooltip: 'Decrease quantity',
-              onPressed: enabled && _quantity > 1
-                  ? () {
-                      setState(() {
-                        _quantity--;
-                      });
-                    }
-                  : null,
-              icon: const Icon(Icons.remove_circle_outline),
-            ),
-
-            Text(product.inStock ? '$_quantity' : '0'),
-
-            IconButton(
-              tooltip: 'Increase quantity',
-              onPressed: enabled && _quantity < product.stockQuantity
-                  ? () {
-                      setState(() {
-                        _quantity++;
-                      });
-                    }
-                  : null,
-              icon: const Icon(Icons.add_circle_outline),
+            const Spacer(),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: colors.outlineVariant),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Decrease quantity',
+                    onPressed: enabled && _quantity > 1
+                        ? () {
+                            setState(() {
+                              _quantity--;
+                            });
+                          }
+                        : null,
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                  ),
+                  SizedBox(
+                    width: 28,
+                    child: Text(
+                      '$displayedQuantity',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Increase quantity',
+                    onPressed: enabled && _quantity < product.stockQuantity
+                        ? () {
+                            setState(() {
+                              _quantity++;
+                            });
+                          }
+                        : null,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
-        if (_busy) const LinearProgressIndicator(),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 6,
+          children: [
+            Text(
+              'Items total',
+              style: TextStyle(
+                color: colors.onPrimaryContainer.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              'Rs. ${total.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: colors.primary,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
 
-        OutlinedButton.icon(
-          onPressed: enabled && _inCart + _quantity <= product.stockQuantity
-              ? _add
-              : null,
-          icon: const Icon(Icons.add_shopping_cart),
-          label: Text(
-            product.inStock && _inCart >= product.stockQuantity
-                ? 'Already in cart'
-                : 'Add to Cart',
-          ),
+        const SizedBox(height: 16),
+
+        if (_busy) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height: 12),
+        ],
+
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
+
+            if (constraints.maxWidth < 340 || largeText) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [addButton, const SizedBox(height: 10), buyButton],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: addButton),
+                const SizedBox(width: 10),
+                Expanded(child: buyButton),
+              ],
+            );
+          },
         ),
 
         if (_inCart > 0 && product.inStock)
@@ -222,20 +319,15 @@ class _ProductPurchaseActionsState extends State<ProductPurchaseActions> {
             label: Text('$_inCart already in cart · View cart'),
           ),
 
-        const SizedBox(height: 8),
-
-        FilledButton.icon(
-          onPressed: enabled ? _buyNow : null,
-          icon: const Icon(Icons.shopping_bag_outlined),
-          label: const Text('Buy Now'),
-        ),
-
         if (!product.inStock)
-          Text(
-            'This product is currently out of stock.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.error,
-              fontWeight: FontWeight.w700,
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              'This product is currently out of stock.',
+              style: TextStyle(
+                color: colors.error,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
       ],

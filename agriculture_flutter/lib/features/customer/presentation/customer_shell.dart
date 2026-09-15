@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/widgets/customer_animated_nav_bar.dart';
+import '../../../shared/widgets/customer_create_menu.dart';
 import '../../cart/presentation/cart_screen.dart';
 import '../../auth/data/models/user_model.dart';
 import '../../profile/data/customer_profile_service.dart';
@@ -19,6 +20,32 @@ class CustomerShell extends StatefulWidget {
 
 class _CustomerShellState extends State<CustomerShell> {
   int _selectedIndex = 0;
+  final _draft = CustomerDraft();
+  bool _creating = false;
+  bool _createMenuOpen = false;
+
+  Future<void> _openCreate() async {
+    if (_creating) return;
+    _creating = true;
+    setState(() => _createMenuOpen = true);
+    try {
+      final action = await showCustomerCreateMenu(context);
+      if (!mounted) return;
+      setState(() => _createMenuOpen = false);
+      if (action == null) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => CustomerComposerScreen(
+            draft: _draft,
+            openCamera: action == CustomerCreateAction.camera,
+          ),
+        ),
+      );
+    } finally {
+      _creating = false;
+      if (mounted && _createMenuOpen) setState(() => _createMenuOpen = false);
+    }
+  }
 
   late final List<Widget?> _pages;
 
@@ -123,6 +150,8 @@ class _CustomerShellState extends State<CustomerShell> {
               : CustomerAnimatedNavBar(
                   selectedIndex: _selectedIndex,
                   onSelected: _selectTab,
+                  onCreate: _openCreate,
+                  isCreateMenuOpen: _createMenuOpen,
                 ),
         ),
       ),

@@ -1,5 +1,5 @@
-import 'dart:ui'; // BackdropFilter භාවිතා කිරීමට අවශ්‍ය වේ
 import 'package:agriculture_flutter/features/auth/presentation/screens/login_screen.dart';
+import 'package:agriculture_flutter/features/auth/presentation/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 
 // ignore: unused_element
@@ -31,108 +31,98 @@ class OnboardingScreen extends StatelessWidget {
             ),
           ),
 
-          // 2. Blur effect (Glassmorphism effect) එක සහිත container එක
+          // 2. Lightweight panel that keeps the background image sharp.
           Center(
             child: Container(
-              width:
-                  MediaQuery.of(context).size.width *
-                  0.85, // Screen width එකෙන් 85% ක්
-              height:
-                  MediaQuery.of(context).size.height *
-                  0.80, // Screen height එකෙන් 80% ක්
+              width: MediaQuery.of(context).size.width * 0.85,
+              height: MediaQuery.of(context).size.height * 0.80,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(
-                  30,
-                ), // මුළු screen එකටම වටකුරු දාර
+                color: Colors.black.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(30),
               ),
-              clipBehavior: Clip.antiAlias, // Clip කිරීම සඳහා
-              child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: 10.0,
-                  sigmaY: 10.0,
-                ), // Blur ප්‍රමාණය
-                child: Container(
-                  color: Colors.white.withValues(
-                    alpha: 0.1,
-                  ), // ඉතා අඩුවෙන් පෙනෙන සුදු පැහැති layer එකක්
-                  padding: const EdgeInsets.all(30.0), // ඇතුලතින් ඉඩ ලබාදීම
-                  child: Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center, // vertical ලෙස මධ්‍යගත කිරීමට
-                    children: [
-                      const Spacer(), // ඉහලින් ඉඩක් තැබීමට
-                      // 3. Main Text එක
-                      const Text(
-                        "The best\napp for\nyour plants", // \n මගින් අලුත් පේලියකට ගනී
+              clipBehavior: Clip.antiAlias,
+              padding: const EdgeInsets.all(30),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(),
+                  const Text(
+                    'The best app for\nyour plants',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 38,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                      letterSpacing: 0.2,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black45,
+                          blurRadius: 10,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 92),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                        side: const BorderSide(color: Colors.white),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Sign in',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2, // පේළි අතර පරතරය
-                        ),
-                        textAlign: TextAlign.center, // මැදට පෙළගැස්වීමට
-                      ),
-
-                      const SizedBox(
-                        height: 100,
-                      ), // Text එක සහ Button එක අතර පරතරය
-                      // 4. Sign in Button එක
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LoginScreen(),
-                              ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            side: const BorderSide(
-                              color: Colors.white,
-                              width: 1,
-                            ), // සුදු පැහැති බෝඩරය
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text(
-                            "Sign in",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 20,
-                      ), // Button එක සහ text එක අතර පරතරය
-                      // 5. Create an account Text එක
-                      InkWell(
-                        onTap: () {
-                          // Register Screen එකට navigate වීමට
-                        },
-                        child: const Text(
-                          "Create an account",
-                          style: TextStyle(
-                            color: Colors
-                                .white70, // තරමක් අඩුවෙන් පෙනෙන සුදු පැහැය
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ),
-
-                      const Spacer(), // පහලින් ඉඩක් තැබීමට
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RegisterScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Create an account',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black38,
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                ],
               ),
             ),
           ),
