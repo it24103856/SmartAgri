@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../shared/widgets/order_status_emblem.dart';
 
 import '../../features/cart/data/cart_service.dart';
 import '../../features/orders/data/purchase_service.dart';
@@ -139,13 +140,15 @@ class _PurchasePaymentScreenState extends State<PurchasePaymentScreen>
       );
     }
 
-    final success = order.paidAndConfirmed || order.codConfirmed;
     final review = order.status == 'PaymentReview';
 
     final String title;
     final String message;
 
-    if (order.paidAndConfirmed) {
+    if (order.status == 'Cancelled') {
+      title = 'Order cancelled';
+      message = 'Your order was cancelled. No payment is due.';
+    } else if (order.paidAndConfirmed) {
       title = 'Payment Successful!';
       message = 'Your order is confirmed.';
     } else if (order.codConfirmed) {
@@ -166,12 +169,6 @@ class _PurchasePaymentScreenState extends State<PurchasePaymentScreen>
           'Check the status before starting another checkout.';
     }
 
-    final accent = success
-        ? const Color(0xFF1B8E63)
-        : review
-        ? Colors.orange.shade800
-        : const Color(0xFF456C73);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Order payment')),
       body: Container(
@@ -191,34 +188,15 @@ class _PurchasePaymentScreenState extends State<PurchasePaymentScreen>
 
               const SizedBox(height: 32),
 
-              Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 400),
-                  width: 116,
-                  height: 116,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: accent,
-                  ),
-                  child: Icon(
-                    success
-                        ? Icons.check_rounded
-                        : review
-                        ? Icons.priority_high_rounded
-                        : Icons.hourglass_top_rounded,
-                    size: 74,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              Center(child: OrderStatusEmblem(status: order.status)),
 
               const SizedBox(height: 28),
 
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF17352C),
+                style: TextStyle(
+                  color: OrderStatusEmblem.colorFor(order.status),
                   fontSize: 27,
                   fontWeight: FontWeight.w800,
                 ),

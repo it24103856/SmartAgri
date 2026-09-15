@@ -35,7 +35,6 @@ class _GlassPalette {
   static const Color accentDark = Color(0xFF16A34A); // deeper green (dark mode)
 
   // Tints mixed into the frosted glass background.
-  static const Color glassTintLight = Color(0xFFDCFCE7); // pale mint
   static const Color glassTintDark = Color(0xFF14532D); // deep green tint
 
   // Base "glass" white used for the frosted look.
@@ -187,7 +186,6 @@ class _CustomerAnimatedNavBarState extends State<CustomerAnimatedNavBar>
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
 
     // ---- GLASS SKIN COLORS (green + white mix) -------------------------

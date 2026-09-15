@@ -51,6 +51,11 @@ class PurchaseOrder {
 
   bool get pending => paymentMethod == 'PAYHERE' && paymentStatus == 'Pending';
 
+  bool get canCancel =>
+      status == 'Confirmed' &&
+      paymentMethod == 'COD' &&
+      paymentStatus == 'Unpaid';
+
   bool get isAcceptedOrder => const {
     'Confirmed',
     'Preparing',
@@ -62,25 +67,36 @@ class PurchaseOrder {
   bool get paidAndConfirmed => paymentStatus == 'Paid' && isAcceptedOrder;
 
   bool get codConfirmed =>
-      paymentMethod == 'COD' &&
-      paymentStatus == 'Unpaid' &&
-      isAcceptedOrder;
+      paymentMethod == 'COD' && paymentStatus == 'Unpaid' && isAcceptedOrder;
 }
 
 class PurchaseService {
   PurchaseService._();
+  Future<PurchaseTracking> tracking(int orderId) async {
+    final result = await _request(
+      () => _dio.get<dynamic>('/customer-orders/$orderId/tracking'),
+    );
+
+    return PurchaseTracking.fromJson(Map<String, dynamic>.from(result as Map));
+  }
 
   static final instance = PurchaseService._();
+
+  Future<void> cancelOrder(int orderId, String reason) async {
+    await _request(
+      () => _dio.post<dynamic>(
+        '/customer-orders/$orderId/cancel',
+        data: {'reason': reason.trim()},
+      ),
+    );
+  }
 
   Dio get _dio => ApiClient.instance.dio;
 
   static String newRequestId() {
     final random = Random.secure();
 
-    final bytes = List<int>.generate(
-      16,
-      (_) => random.nextInt(256),
-    );
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
 
     // UUID version 4.
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -157,5 +173,23 @@ class PurchaseService {
     );
 
     return Uri.parse((result as Map)['url'] as String);
+  }
+}
+
+class PurchaseTracking {
+  final PurchaseOrder order;
+  final List<Map<String, dynamic>> history;
+
+  const PurchaseTracking({required this.order, required this.history});
+
+  factory PurchaseTracking.fromJson(Map<String, dynamic> json) {
+    return PurchaseTracking(
+      order: PurchaseOrder.fromJson(
+        Map<String, dynamic>.from(json['order'] as Map),
+      ),
+      history: (json['history'] as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(),
+    );
   }
 }

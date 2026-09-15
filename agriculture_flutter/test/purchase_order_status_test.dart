@@ -24,6 +24,26 @@ void main() {
     }
   });
 
+  test('only confirmed unpaid COD orders can be cancelled', () {
+    expect(order('Confirmed', 'COD', 'Unpaid').canCancel, isTrue);
+    for (final status in [
+      'AwaitingPayment',
+      'Preparing',
+      'Packed',
+      'Dispatched',
+      'Delivered',
+      'Cancelled',
+      'PaymentFailed',
+      'PaymentReview',
+    ]) {
+      expect(order(status, 'COD', 'Unpaid').canCancel, isFalse);
+    }
+    for (final payment in ['Paid', 'Pending', 'Cancelled', 'Failed']) {
+      expect(order('Confirmed', 'COD', payment).canCancel, isFalse);
+    }
+    expect(order('Confirmed', 'PAYHERE', 'Unpaid').canCancel, isFalse);
+  });
+
   test('unaccepted orders do not report confirmation', () {
     for (final status in ['Pending', 'Cancelled', 'Rejected', 'Unknown']) {
       expect(order(status, 'PAYHERE', 'Paid').paidAndConfirmed, isFalse);

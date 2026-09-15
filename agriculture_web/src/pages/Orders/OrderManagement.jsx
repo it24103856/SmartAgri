@@ -19,6 +19,7 @@ const STATUS_LABELS = {
   Delivered: 'Delivered',
   PaymentFailed: 'Payment failed',
   PaymentReview: 'Needs review',
+  Cancelled: 'Cancelled',
 };
 
 const moneyFormatter = new Intl.NumberFormat('en-LK', {
@@ -103,7 +104,7 @@ function StatusBadge({ status }) {
   const tone =
     status === 'Delivered'
       ? 'bg-green-100 text-green-800'
-      : status === 'PaymentFailed' || status === 'PaymentReview'
+      : ['PaymentFailed', 'PaymentReview', 'Cancelled'].includes(status)
         ? 'bg-red-100 text-red-800'
         : status === 'AwaitingPayment'
           ? 'bg-amber-100 text-amber-800'
@@ -482,7 +483,9 @@ function OrderDetail({ id, onBack, onReload }) {
               <p className="text-sm text-gray-600">
                 {order.status === 'Delivered'
                   ? 'This order has been delivered.'
-                  : 'No fulfilment update is available for this status. Payment or review must be resolved first.'}
+                  : order.status === 'Cancelled'
+                    ? 'The customer cancelled this order. Stock was restored and no payment is due.'
+                    : 'No fulfilment update is available for this status. Payment or review must be resolved first.'}
               </p>
             ) : !paymentReady ? (
               <Notice error>

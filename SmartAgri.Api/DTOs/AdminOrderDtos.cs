@@ -8,7 +8,7 @@ public sealed class AdminOrderQuery
     public string? Search { get; set; }
 
     [RegularExpression(
-        "^(AwaitingPayment|Confirmed|Preparing|Packed|Dispatched|Delivered|PaymentFailed|PaymentReview)$")]
+        "^(AwaitingPayment|Confirmed|Preparing|Packed|Dispatched|Delivered|PaymentFailed|PaymentReview|Cancelled)$")]
     public string? Status { get; set; }
 
     [Range(1, 100000)]
