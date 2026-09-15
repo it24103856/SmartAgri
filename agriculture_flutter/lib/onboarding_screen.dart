@@ -45,7 +45,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       if (!mounted) return;
       await _video.setLooping(true);
       if (!mounted) return;
-      await _video.setPlaybackSpeed(0.25);
+      await _video.setPlaybackSpeed(0.5);
       if (!mounted) return;
       setState(() => _ready = true);
       _syncPlayback();
