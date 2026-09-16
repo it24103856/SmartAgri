@@ -10,6 +10,8 @@ using SmartAgri.Api.Middleware;
 using SmartAgri.Api.Services;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.DataProtection;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +98,51 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key),
         RoleClaimType = ClaimTypes.Role
     };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var principal = context.Principal;
+
+            if (!int.TryParse(
+                    principal?.FindFirstValue(ClaimTypes.NameIdentifier),
+                    out var userId) ||
+                !Guid.TryParse(
+                    principal?.FindFirstValue("session_stamp"),
+                    out var tokenStamp))
+            {
+                context.Fail("Invalid session.");
+                return;
+            }
+
+            var db = context.HttpContext.RequestServices
+                .GetRequiredService<ApplicationDbContext>();
+
+            var account = await db.Users
+                .AsNoTracking()
+                .Where(user => user.Id == userId)
+                .Select(user => new
+                {
+                    user.SessionStamp,
+                    user.Status,
+                    user.Role
+                })
+                .SingleOrDefaultAsync(
+                    context.HttpContext.RequestAborted);
+
+            var tokenRole =
+                principal?.FindFirstValue(ClaimTypes.Role);
+
+            if (account is null ||
+                account.Status != "ACTIVE" ||
+                account.SessionStamp != tokenStamp ||
+                account.Role != tokenRole)
+            {
+                context.Fail("Session is no longer valid.");
+            }
+        }
+    };
 });
 
 builder.Services.AddAuthorization();
@@ -104,10 +151,69 @@ builder.Services.AddDataProtection();
 builder.Services.AddScoped<CustomerCheckoutService>();
 builder.Services.AddScoped<AdminOrderService>();
 builder.Services.AddScoped<CustomerOrderCancellationService>();
+builder.Services.AddTransient<EmailService>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddSingleton<PasswordResetQueue>();
+builder.Services.AddHostedService<PasswordResetWorker>();
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("password-reset", context =>
+    {
+        var address =
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: address,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+});
 
 
 var app = builder.Build();
+if (app.Environment.IsDevelopment() &&
+    app.Configuration.GetValue<bool>("Email:SendStartupTest"))
+{
+    using var scope = app.Services.CreateScope();
+
+    var emailService =
+        scope.ServiceProvider.GetRequiredService<EmailService>();
+
+    var recipient = app.Configuration["Email:FromEmail"]
+        ?? throw new InvalidOperationException(
+            "Email:FromEmail is not configured.");
+
+    try
+    {
+        using var timeout =
+            new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        await emailService.SendAsync(
+            recipient,
+            "SmartAgri email test",
+            "Your SmartAgri backend email service is working.",
+            timeout.Token);
+
+        app.Logger.LogInformation(
+            "Email test accepted by the SMTP server. Check your inbox.");
+    }
+    catch (Exception ex)
+    {
+        // Do not log credentials or email contents.
+        app.Logger.LogError(
+            "Email test failed ({ErrorType}). Check SMTP configuration.",
+            ex.GetType().Name);
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -146,7 +252,6 @@ app.UseStaticFiles(new StaticFileOptions
         context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
 
-// IMPORTANT: UseAuthentication must come BEFORE UseAuthorization.
 var profileImageStore = app.Services.GetRequiredService<ProfileImageStore>();
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -155,11 +260,12 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = context => context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
 
+app.UseRouting();
+
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
-// FIX: "mapControllers:" was an invalid/unused C# label, not a real call.
-// This line is what actually wires up your [ApiController] routes.
 app.MapControllers();
 
 app.Run();

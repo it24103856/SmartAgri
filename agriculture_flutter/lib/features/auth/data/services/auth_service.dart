@@ -29,29 +29,43 @@ class AuthService {
   Future<AuthResult> login({
     required String email,
     required String password,
+    bool rememberMe = false,
   }) async {
     try {
       final response = await _dio.post(
         ApiConstants.login,
         data: {'email': email, 'password': password},
+        options: Options(extra: {'publicRequest': true}),
       );
 
       final token = response.data['token'] as String;
-      final userJson = response.data['user'] as Map<String, dynamic>;
-      final user = UserModel.fromJson(userJson);
+      final user = UserModel.fromJson(
+        Map<String, dynamic>.from(response.data['user'] as Map),
+      );
+
+      if (!user.isActive) {
+        throw AuthException('This account is not active.');
+      }
+
+      if (user.isAdmin) {
+        throw AuthException(
+          'Admin accounts should sign in via the web dashboard.',
+        );
+      }
 
       await TokenStorage.instance.saveSession(
         token: token,
         role: user.role,
         fullName: user.fullName,
         email: user.email,
+        rememberMe: rememberMe,
       );
 
       return AuthResult(token: token, user: user);
-    } on DioException catch (e) {
+    } on DioException catch (error) {
       throw AuthException(
         _extractMessage(
-          e,
+          error,
           fallback: 'Login failed. Please check your connection.',
         ),
       );

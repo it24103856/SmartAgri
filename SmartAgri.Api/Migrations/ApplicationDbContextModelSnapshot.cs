@@ -442,6 +442,24 @@ namespace SmartAgri.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("PasswordResetExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PasswordResetFailedAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PasswordResetHash")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PasswordResetLastSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PasswordResetSendCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PasswordResetWindowStart")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
@@ -454,6 +472,9 @@ namespace SmartAgri.Api.Migrations
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid>("SessionStamp")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()

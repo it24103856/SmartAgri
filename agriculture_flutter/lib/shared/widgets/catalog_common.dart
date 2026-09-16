@@ -8,10 +8,6 @@ import '../../features/products/data/services/catalog_service.dart';
 
 Future<void> signOutCustomer(BuildContext context) async {
   await AuthService.instance.logout();
-
-  if (!context.mounted) return;
-
-  Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
 }
 
 class CatalogImage extends StatelessWidget {

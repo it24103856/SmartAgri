@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import '../../data/services/auth_service.dart';
 import '../../../home/presentation/screens/home_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -35,8 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final result = await AuthService.instance.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        rememberMe: _rememberMe,
       );
-
       if (!mounted) return;
 
       // ADMIN accounts should use the web dashboard, not this mobile app.
@@ -67,6 +69,16 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not save your session. Please try signing in again.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -241,7 +253,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                         GestureDetector(
-                          onTap: () {},
+                          onTap: _isLoading
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const ForgotPasswordScreen(),
+                                    ),
+                                  );
+                                },
                           child: Text(
                             "Forgot Password ?",
                             style: TextStyle(

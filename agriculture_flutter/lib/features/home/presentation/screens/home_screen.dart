@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../customer/presentation/customer_shell.dart';
 import '../../../auth/data/services/auth_service.dart';
-import '../../../auth/presentation/screens/login_screen.dart';
 
 /// Temporary landing screen after login — replace with the real
 /// Farmer/Customer dashboards once those features are built.
@@ -13,12 +12,6 @@ class HomeScreen extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     await AuthService.instance.logout();
-    if (!context.mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
-    );
   }
 
   @override

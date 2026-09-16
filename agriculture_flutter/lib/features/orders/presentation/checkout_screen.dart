@@ -5,6 +5,9 @@ import '../../cart/data/cart_service.dart';
 import '../../../payments/presentation/payment_result_screen.dart';
 import '../../products/data/services/catalog_service.dart';
 import '../data/purchase_service.dart';
+import 'dart:async';
+
+import '../../profile/data/customer_profile_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final int? productId;
@@ -25,6 +28,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _address = TextEditingController();
   final _city = TextEditingController();
 
+  final Set<TextEditingController> _editedFields = {};
+
+  bool _profileLoading = true;
+  String? _profileNotice;
+
   late Future<CartData> _future;
 
   String _method = 'COD';
@@ -37,7 +45,70 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+
     _future = _load();
+
+    unawaited(_loadProfileDetails());
+  }
+
+  bool _fillProfileField(TextEditingController controller, String? value) {
+    final text = value?.trim() ?? '';
+
+    // Preserve anything the customer has typed or deliberately cleared.
+    if (_editedFields.contains(controller) ||
+        controller.text.isNotEmpty ||
+        text.isEmpty) {
+      return false;
+    }
+
+    controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+
+    return true;
+  }
+
+  Future<void> _loadProfileDetails() async {
+    try {
+      final user = await CustomerProfileService.instance.load();
+
+      if (!mounted) return;
+
+      // Do not change delivery details after order submission has started.
+      if (_busy || _submittedRequest != null) return;
+
+      var filledCount = 0;
+
+      if (_fillProfileField(_name, user.fullName)) filledCount++;
+      if (_fillProfileField(_email, user.email)) filledCount++;
+      if (_fillProfileField(_phone, user.phone)) filledCount++;
+      if (_fillProfileField(_address, user.address)) filledCount++;
+      if (_fillProfileField(_city, user.city)) filledCount++;
+
+      setState(() {
+        _profileNotice = filledCount > 0
+            ? 'Saved details added. Check your delivery address before ordering.'
+            : 'Enter or review your delivery details below.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        if (error is CustomerProfileException &&
+            (error.statusCode == 401 || error.statusCode == 403)) {
+          _profileNotice = error.message;
+        } else {
+          _profileNotice =
+              'Saved details could not be loaded. '
+              'You can enter your delivery details manually.';
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _profileLoading = false);
+      }
+    }
   }
 
   Future<CartData> _load() {
@@ -73,6 +144,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
         controller: controller,
+        onChanged: (_) {
+          _editedFields.add(controller);
+        },
         keyboardType: keyboard,
         maxLines: lines,
         decoration: InputDecoration(
@@ -264,6 +338,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
+
+                          if (_profileLoading)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 14),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Loading saved details… You can also type below.',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          if (!_profileLoading && _profileNotice != null)
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _profileNotice!,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
 
                           _field(_name, 'Full name'),
                           _field(

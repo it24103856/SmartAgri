@@ -58,6 +58,76 @@ public class AuthController : ControllerBase
         }
     }
 
+    // GET: api/auth/session
+[HttpGet("session")]
+[Authorize]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+public async Task<IActionResult> Session(
+    [FromServices] ApplicationDbContext db,
+    CancellationToken cancellationToken)
+{
+    if (!int.TryParse(
+        User.FindFirstValue(ClaimTypes.NameIdentifier),
+        out var userId))
+    {
+        return Unauthorized(new
+        {
+            code = "SESSION_INVALID",
+            message = "Please sign in again."
+        });
+    }
+
+    var account = await db.Users
+        .AsNoTracking()
+        .Where(user => user.Id == userId)
+        .Select(user => new
+        {
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.Phone,
+            user.Address,
+            user.City,
+            user.Province,
+            user.ProfileImageUrl,
+            user.Role,
+            user.Status,
+            user.CreatedAt
+        })
+        .SingleOrDefaultAsync(cancellationToken);
+
+    if (account is null)
+    {
+        return Unauthorized(new
+        {
+            code = "SESSION_INVALID",
+            message = "This account is no longer available."
+        });
+    }
+
+    if (account.Status != "ACTIVE")
+    {
+        return StatusCode(StatusCodes.Status403Forbidden, new
+        {
+            code = "ACCOUNT_INACTIVE",
+            message = "This account is not active. Please contact support."
+        });
+    }
+
+    var tokenRole = User.FindFirstValue(ClaimTypes.Role);
+
+    if (!string.Equals(account.Role, tokenRole, StringComparison.Ordinal))
+    {
+        return Unauthorized(new
+        {
+            code = "SESSION_INVALID",
+            message = "Your account permissions changed. Please sign in again."
+        });
+    }
+
+    return Ok(account);
+}
+
     [HttpPut("profile-photo")]
     [Authorize]
     [Consumes("multipart/form-data")]

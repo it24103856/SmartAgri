@@ -1,4 +1,5 @@
 namespace SmartAgri.Api.Models;
+using System.Text.Json.Serialization;
 
 public class User
 {
@@ -20,4 +21,24 @@ public class User
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+    [JsonIgnore]
+public Guid SessionStamp { get; set; } = Guid.Empty;
+
+[JsonIgnore]
+public string? PasswordResetHash { get; set; }
+
+[JsonIgnore]
+public DateTime? PasswordResetExpiresAt { get; set; }
+
+[JsonIgnore]
+public DateTime? PasswordResetLastSentAt { get; set; }
+
+[JsonIgnore]
+public DateTime? PasswordResetWindowStart { get; set; }
+
+[JsonIgnore]
+public int PasswordResetSendCount { get; set; }
+
+[JsonIgnore]
+public int PasswordResetFailedAttempts { get; set; }
 }

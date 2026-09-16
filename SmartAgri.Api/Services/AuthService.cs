@@ -89,13 +89,14 @@ public class AuthService : IAuthService
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
 
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role)
-        };
+       var claims = new[]
+{
+    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+    new Claim(ClaimTypes.Name, user.FullName),
+    new Claim(ClaimTypes.Email, user.Email),
+    new Claim(ClaimTypes.Role, user.Role),
+    new Claim("session_stamp", user.SessionStamp.ToString("D"))
+};
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
