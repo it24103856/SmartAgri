@@ -25,11 +25,157 @@ public class ApplicationDbContext : DbContext
 public DbSet<CustomerOrderLine> CustomerOrderLines =>
     Set<CustomerOrderLine>();
 
+
+        public DbSet<SmartBasketWorkflow> SmartBasketWorkflows =>
+        Set<SmartBasketWorkflow>();
+
+    public DbSet<SmartBasketItem> SmartBasketItems =>
+        Set<SmartBasketItem>();
+
+    public DbSet<SmartBasketStep> SmartBasketSteps =>
+        Set<SmartBasketStep>();
+
+    public DbSet<SmartBasketApproval> SmartBasketApprovals =>
+        Set<SmartBasketApproval>();
+
 public DbSet<CustomerPayment> CustomerPayments =>
     Set<CustomerPayment>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+                modelBuilder.Entity<SmartBasketWorkflow>(entity =>
+        {
+            entity.ToTable("SmartBasketWorkflows", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_SmartBasketWorkflow_Budget",
+                    "\"Budget\" > 0");
+
+                table.HasCheckConstraint(
+                    "CK_SmartBasketWorkflow_Total",
+                    "\"ProposedTotal\" >= 0 AND " +
+                    "\"ProposedTotal\" <= \"Budget\"");
+
+                table.HasCheckConstraint(
+                    "CK_SmartBasketWorkflow_Status",
+                    "\"Status\" IN (" +
+                    "'Pending', 'Planning', 'Validating', " +
+                    "'AwaitingApproval', 'Approved', " +
+                    "'Rejected', 'Failed')");
+            });
+
+            entity.HasKey(value => value.Id);
+
+            entity.HasIndex(value => new
+            {
+                value.CustomerId,
+                value.RequestId
+            }).IsUnique();
+
+            entity.HasIndex(value => new
+            {
+                value.Status,
+                value.CreatedAt
+            });
+
+            entity.Property(value => value.Version)
+                .IsConcurrencyToken();
+
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(value => value.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(value => value.Items)
+                .WithOne()
+                .HasForeignKey(value => value.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(value => value.Steps)
+                .WithOne()
+                .HasForeignKey(value => value.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(value => value.Approvals)
+                .WithOne()
+                .HasForeignKey(value => value.WorkflowId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SmartBasketItem>(entity =>
+        {
+            entity.ToTable("SmartBasketItems", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_SmartBasketItem_Quantity",
+                    "\"Quantity\" > 0");
+
+                table.HasCheckConstraint(
+                    "CK_SmartBasketItem_Price",
+                    "\"UnitPrice\" > 0");
+
+                table.HasCheckConstraint(
+                    "CK_SmartBasketItem_Revision",
+                    "\"ProposalRevision\" > 0");
+            });
+
+            entity.HasKey(value => value.Id);
+
+            entity.HasIndex(value => new
+            {
+                value.WorkflowId,
+                value.ProposalRevision,
+                value.ProductId
+            }).IsUnique();
+
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(value => value.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SmartBasketStep>(entity =>
+        {
+            entity.ToTable("SmartBasketSteps");
+
+            entity.HasKey(value => value.Id);
+
+            entity.HasIndex(value => new
+            {
+                value.WorkflowId,
+                value.Attempt,
+                value.Sequence
+            }).IsUnique();
+        });
+
+        modelBuilder.Entity<SmartBasketApproval>(entity =>
+        {
+            entity.ToTable("SmartBasketApprovals", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_SmartBasketApproval_Decision",
+                    "\"Decision\" IN (" +
+                    "'Approved', 'Rejected', 'RevisionRequested')");
+
+                table.HasCheckConstraint(
+                    "CK_SmartBasketApproval_Revision",
+                    "\"ProposalRevision\" > 0");
+            });
+
+            entity.HasKey(value => value.Id);
+
+            // One decision per proposal revision.
+            entity.HasIndex(value => new
+            {
+                value.WorkflowId,
+                value.ProposalRevision
+            }).IsUnique();
+
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(value => value.AdminId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         modelBuilder.Entity<CustomerOrderStatusHistory>(entity =>
         {
