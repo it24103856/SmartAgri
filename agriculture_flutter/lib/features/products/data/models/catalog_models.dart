@@ -17,6 +17,12 @@ class CatalogCategory {
 }
 
 class CatalogProduct {
+  final bool isFood;
+  final String? nutritionFacts;
+  final String? nutritionBasis;
+  final String? nutritionSourceName;
+  final String? nutritionSourceUrl;
+
   final int id;
   final int categoryId;
   final int stockQuantity;
@@ -32,6 +38,11 @@ class CatalogProduct {
   final List<String> images;
 
   const CatalogProduct({
+    this.isFood = false,
+    this.nutritionFacts,
+    this.nutritionBasis,
+    this.nutritionSourceName,
+    this.nutritionSourceUrl,
     required this.id,
     required this.categoryId,
     required this.name,
@@ -59,6 +70,11 @@ class CatalogProduct {
     }
 
     return CatalogProduct(
+      isFood: json['isFood'] == true,
+      nutritionFacts: json['nutritionFacts'] as String?,
+      nutritionBasis: json['nutritionBasis'] as String?,
+      nutritionSourceName: json['nutritionSourceName'] as String?,
+      nutritionSourceUrl: json['nutritionSourceUrl'] as String?,
       id: (json['id'] as num).toInt(),
       categoryId: (json['categoryId'] as num).toInt(),
       name: json['name'] as String,

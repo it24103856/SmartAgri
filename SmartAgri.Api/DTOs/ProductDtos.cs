@@ -2,8 +2,57 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SmartAgri.Api.DTOs;
 
-public class SaveProductDto
+public class SaveProductDto : IValidatableObject
 {
+    public bool IsFood { get; set; }
+
+    [StringLength(2000)]
+    public string? NutritionFacts { get; set; }
+
+    [StringLength(200)]
+    public string? NutritionBasis { get; set; }
+
+    [StringLength(200)]
+    public string? NutritionSourceName { get; set; }
+
+    [StringLength(1000)]
+    public string? NutritionSourceUrl { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!IsFood)
+            yield break;
+
+        var values = new[]
+        {
+            NutritionFacts,
+            NutritionBasis,
+            NutritionSourceName,
+            NutritionSourceUrl
+        };
+
+        if (values.All(string.IsNullOrWhiteSpace))
+            yield break;
+
+        if (values.Any(string.IsNullOrWhiteSpace))
+        {
+            yield return new ValidationResult(
+                "Provide nutrition information, reference quantity, " +
+                "source name and source URL together.",
+                new[] { nameof(NutritionFacts) });
+        }
+
+        if (!Uri.TryCreate(NutritionSourceUrl, UriKind.Absolute, out var uri) ||
+            uri.Scheme != "https" ||
+            string.IsNullOrEmpty(uri.Host) ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            yield return new ValidationResult(
+                "Nutrition source must be a valid HTTPS URL.",
+                new[] { nameof(NutritionSourceUrl) });
+        }
+    }
+
     private string _name = string.Empty;
 
     [Required]
@@ -55,6 +104,12 @@ public class ReviewProductDto
 
 public class ProductResponseDto
 {
+    public bool IsFood { get; set; }
+    public string? NutritionFacts { get; set; }
+    public string? NutritionBasis { get; set; }
+    public string? NutritionSourceName { get; set; }
+    public string? NutritionSourceUrl { get; set; }
+
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;

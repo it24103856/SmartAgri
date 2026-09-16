@@ -112,6 +112,11 @@ public class ProductService : IProductService
         product.Unit = dto.Unit;
         product.WeightKg = dto.WeightKg;
         product.StockQuantity = dto.StockQuantity;
+        product.IsFood = dto.IsFood;
+        product.NutritionFacts = dto.IsFood ? dto.NutritionFacts?.Trim() : null;
+        product.NutritionBasis = dto.IsFood ? dto.NutritionBasis?.Trim() : null;
+        product.NutritionSourceName = dto.IsFood ? dto.NutritionSourceName?.Trim() : null;
+        product.NutritionSourceUrl = dto.IsFood ? dto.NutritionSourceUrl?.Trim() : null;
     }
 
     public async Task<List<ProductResponseDto>> GetAllAsync(int adminId)
@@ -305,6 +310,11 @@ public class ProductService : IProductService
     {
         return new ProductResponseDto
         {
+            IsFood = product.IsFood,
+            NutritionFacts = product.NutritionFacts,
+            NutritionBasis = product.NutritionBasis,
+            NutritionSourceName = product.NutritionSourceName,
+            NutritionSourceUrl = product.NutritionSourceUrl,
             Id = product.Id,
             Name = product.Name,
             Description = product.Description,

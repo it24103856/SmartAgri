@@ -39,4 +39,14 @@ public class Product
 
     // Prevents an old screen from overwriting newer changes.
     public Guid Version { get; set; } = Guid.NewGuid();
+
+        public bool IsFood { get; set; }
+
+    public string? NutritionFacts { get; set; }
+
+    public string? NutritionBasis { get; set; }
+
+    public string? NutritionSourceName { get; set; }
+
+    public string? NutritionSourceUrl { get; set; }
 }

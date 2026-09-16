@@ -175,6 +175,11 @@ function SelectedImages({ files }) {
 
 function ProductForm({ product, categories, onClose, onSaved }) {
   const [form, setForm] = useState({
+    isFood: product?.isFood || false,
+    nutritionFacts: product?.nutritionFacts || '',
+    nutritionBasis: product?.nutritionBasis || '',
+    nutritionSourceName: product?.nutritionSourceName || '',
+    nutritionSourceUrl: product?.nutritionSourceUrl || '',
     name: product?.name || '',
     categoryId: product?.categoryId?.toString() || '',
     description: product?.description || '',
@@ -373,6 +378,63 @@ function ProductForm({ product, categories, onClose, onSaved }) {
               />
             </div>
           ))}
+
+          <div className="cat-field product-span">
+            <label>
+              <input
+                type="checkbox"
+                checked={form.isFood}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    isFood: event.target.checked,
+                  }))
+                }
+              />
+              {' '}Food product
+            </label>
+
+            <small>
+              Leave off for fertilizer, equipment and other non-food items.
+            </small>
+          </div>
+
+          {form.isFood && (
+            <fieldset className="cat-field product-span">
+              <legend>Nutrition information — optional</legend>
+
+              <p>
+                Enter verified information for this food. Complete all four
+                fields, or leave all blank when information is unavailable.
+              </p>
+
+              {[
+                ['nutritionFacts', 'Nutrient information with units', 2000],
+                ['nutritionBasis', 'Reference quantity and preparation (e.g. per 100 g, raw)', 200],
+                ['nutritionSourceName', 'Source name and food record identifier', 200],
+                ['nutritionSourceUrl', 'Direct HTTPS source URL', 1000],
+              ].map(([name, label, maxLength]) => (
+                <div className="cat-field" key={name}>
+                  <label htmlFor={name}>{label}</label>
+
+                  <textarea
+                    id={name}
+                    name={name}
+                    value={form[name]}
+                    onChange={change}
+                    maxLength={maxLength}
+                    rows={name === 'nutritionFacts' ? 4 : 2}
+                    required={[
+                      'nutritionFacts',
+                      'nutritionBasis',
+                      'nutritionSourceName',
+                      'nutritionSourceUrl',
+                    ].some((key) => form[key].trim())}
+                  />
+                </div>
+              ))}
+            </fieldset>
+          )}
 
           <div className="cat-field product-span">
             <label htmlFor="product-description">Description</label>

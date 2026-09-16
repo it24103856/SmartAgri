@@ -50,6 +50,11 @@ public sealed class CatalogController : ControllerBase
     {
         return products.Select(p => new CatalogProductDto
         {
+            IsFood = p.IsFood,
+            NutritionFacts = p.NutritionFacts,
+            NutritionBasis = p.NutritionBasis,
+            NutritionSourceName = p.NutritionSourceName,
+            NutritionSourceUrl = p.NutritionSourceUrl,
             Id = p.Id,
             Name = p.Name,
             Description = p.Description,
@@ -228,6 +233,12 @@ public sealed class CatalogController : ControllerBase
 
 public sealed class CatalogProductDto
 {
+    public bool IsFood { get; set; }
+    public string? NutritionFacts { get; set; }
+    public string? NutritionBasis { get; set; }
+    public string? NutritionSourceName { get; set; }
+    public string? NutritionSourceUrl { get; set; }
+
     public int Id { get; set; }
 
     public string Name { get; set; } = "";

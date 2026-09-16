@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../shared/widgets/app_entrance.dart';
 import '../../../../shared/widgets/catalog_common.dart';
@@ -269,6 +270,60 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
           Divider(color: colors.outlineVariant),
 
+          if (product.isFood) ...[
+            Text(
+              'Nutrition information',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if ([
+              product.nutritionFacts,
+              product.nutritionBasis,
+              product.nutritionSourceName,
+              product.nutritionSourceUrl,
+            ].every((value) => value != null && value.trim().isNotEmpty)) ...[
+              Text(product.nutritionBasis!),
+              const SizedBox(height: 8),
+              Text(product.nutritionFacts!),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: Text('Source: ${product.nutritionSourceName}'),
+                onPressed: () async {
+                  final uri = Uri.tryParse(product.nutritionSourceUrl!);
+                  var opened = false;
+
+                  try {
+                    if (uri != null &&
+                        uri.scheme == 'https' &&
+                        uri.host.isNotEmpty &&
+                        uri.userInfo.isEmpty) {
+                      opened = await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  } catch (_) {
+                    // Display a recoverable message below.
+                  }
+
+                  if (!opened && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not open the source. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ] else
+              const Text(
+                'Verified nutrition information is not available yet.',
+              ),
+            const SizedBox(height: 16),
+          ],
           ProductPurchaseActions(key: ValueKey(product.id), product: product),
         ],
       ),
