@@ -7,7 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/utils/token_storage.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
-import 'features/auth/presentation/screens/session_restore_screen.dart';
+import 'splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -92,7 +92,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           darkTheme: AppTheme.darkTheme(),
           themeMode: mode,
           routes: {'/login': (_) => const LoginScreen()},
-          home: _showLogin ? const LoginScreen() : const SessionRestoreScreen(),
+          home: _showLogin ? const LoginScreen() : const SplashScreen(),
         );
       },
     );
