@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartAgri.Api.Data;
@@ -12,9 +13,11 @@ using SmartAgri.Api.Data;
 namespace SmartAgri.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260919194837_AddSmartBasketCustomerReview")]
+    partial class AddSmartBasketCustomerReview
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -167,12 +170,6 @@ namespace SmartAgri.Api.Migrations
                     b.Property<string>("ReviewReason")
                         .HasColumnType("text");
 
-                    b.Property<int?>("SmartBasketRevision")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SmartBasketWorkflowId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -188,18 +185,12 @@ namespace SmartAgri.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SmartBasketWorkflowId")
-                        .IsUnique();
-
                     b.HasIndex("Status", "CreatedAt");
 
                     b.HasIndex("UserId", "RequestId")
                         .IsUnique();
 
-                    b.ToTable("CustomerOrders", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_CustomerOrder_SmartBasketLink", "(\"SmartBasketWorkflowId\" IS NULL AND \"SmartBasketRevision\" IS NULL) OR (\"SmartBasketWorkflowId\" IS NOT NULL AND \"SmartBasketRevision\" IS NOT NULL AND \"SmartBasketRevision\" > 0)");
-                        });
+                    b.ToTable("CustomerOrders");
                 });
 
             modelBuilder.Entity("SmartAgri.Api.Models.CustomerOrderLine", b =>
@@ -682,7 +673,7 @@ namespace SmartAgri.Api.Migrations
                         {
                             t.HasCheckConstraint("CK_SmartBasketWorkflow_Budget", "\"Budget\" > 0");
 
-                            t.HasCheckConstraint("CK_SmartBasketWorkflow_Status", "\"Status\" IN ('Pending', 'Planning', 'Validating', 'AwaitingCustomerReview', 'AwaitingApproval', 'Approved', 'Rejected', 'Failed', 'Ordered')");
+                            t.HasCheckConstraint("CK_SmartBasketWorkflow_Status", "\"Status\" IN ('Pending', 'Planning', 'Validating', 'AwaitingCustomerReview', 'AwaitingApproval', 'Approved', 'Rejected', 'Failed')");
 
                             t.HasCheckConstraint("CK_SmartBasketWorkflow_Total", "\"ProposedTotal\" >= 0 AND \"ProposedTotal\" <= \"Budget\"");
                         });
@@ -789,11 +780,6 @@ namespace SmartAgri.Api.Migrations
 
             modelBuilder.Entity("SmartAgri.Api.Models.CustomerOrder", b =>
                 {
-                    b.HasOne("SmartAgri.Api.Models.SmartBasketWorkflow", null)
-                        .WithMany()
-                        .HasForeignKey("SmartBasketWorkflowId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("SmartAgri.Api.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")

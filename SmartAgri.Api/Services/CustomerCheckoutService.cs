@@ -145,6 +145,35 @@ public sealed class CustomerCheckoutService
                     "A request ID is required.");
             }
 
+            if (request.Items is null ||
+                request.Items.Count < 1 ||
+                request.Items.Count > 100 ||
+                request.Items.Any(line =>
+                    line is null ||
+                    line.ProductId <= 0 ||
+                    line.Quantity < 1 ||
+                    line.Quantity > 100000 ||
+                    line.UnitPrice <= 0) ||
+                request.Items.Select(line => line.ProductId).Distinct().Count()
+                    != request.Items.Count ||
+                (request.PaymentMethod != "COD" &&
+                 request.PaymentMethod != "PAYHERE"))
+            {
+                throw new BadHttpRequestException(
+                    "Invalid checkout items or payment method.", 400);
+            }
+
+            var activeCustomer = await _db.Users.AnyAsync(user =>
+                user.Id == userId &&
+                user.Role == "CUSTOMER" &&
+                user.Status == "ACTIVE");
+
+            if (!activeCustomer)
+            {
+                throw new BadHttpRequestException(
+                    "An active customer account is required.", 403);
+            }
+
             var hash = Sha256(JsonSerializer.Serialize(request));
 
             var existing = await Orders.SingleOrDefaultAsync(o =>
@@ -162,6 +191,8 @@ public sealed class CustomerCheckoutService
 
                 return existing;
             }
+
+            var smartBasket = await ValidateSmartBasket(userId, request);
 
             if (request.PaymentMethod == "PAYHERE")
                 PayHereSettings();
@@ -208,6 +239,8 @@ public sealed class CustomerCheckoutService
             var order = new CustomerOrder
             {
                 UserId = userId,
+                SmartBasketWorkflowId = smartBasket?.Id,
+                SmartBasketRevision = smartBasket?.ProposalRevision,
                 RequestId = request.RequestId,
                 RequestHash = hash,
                 FullName = request.FullName.Trim(),
@@ -252,6 +285,14 @@ public sealed class CustomerCheckoutService
             order.Subtotal = order.Items.Sum(i => i.LineTotal);
             order.TotalAmount = order.Subtotal + order.DeliveryFee;
 
+            if (smartBasket is not null &&
+                (order.Subtotal != smartBasket.ProposedTotal ||
+                 order.TotalAmount > smartBasket.Budget))
+            {
+                throw new BadHttpRequestException(
+                    "Checkout total does not match the approved budget.", 409);
+            }
+
             order.Payment = new CustomerPayment
             {
                 Method = request.PaymentMethod,
@@ -273,9 +314,203 @@ public sealed class CustomerCheckoutService
                 await ClearPurchasedCartLines(order);
             }
 
+            if (smartBasket is not null)
+            {
+                var now = DateTime.UtcNow;
+
+                smartBasket.Status = SmartBasketStatus.Ordered;
+                smartBasket.Version = Guid.NewGuid();
+                smartBasket.UpdatedAt = now;
+
+                // Payment and delivery continue through the linked order.
+                smartBasket.CompletedAt = null;
+
+                var lastSequence = await _db.SmartBasketSteps
+                    .Where(step =>
+                        step.WorkflowId == smartBasket.Id &&
+                        step.Attempt == smartBasket.AttemptCount)
+                    .MaxAsync(step => (int?)step.Sequence) ?? -1;
+
+                _db.SmartBasketSteps.Add(new SmartBasketStep
+                {
+                    WorkflowId = smartBasket.Id,
+                    Attempt = smartBasket.AttemptCount,
+                    Sequence = lastSequence + 1,
+                    AgentName = "Customer",
+                    ToolName = "checkout_approved_basket",
+                    Status = "Completed",
+                    StartedAt = now,
+                    FinishedAt = now,
+                    OutputJson = JsonSerializer.Serialize(new
+                    {
+                        requestId = request.RequestId,
+                        revision = smartBasket.ProposalRevision,
+                        total = order.TotalAmount,
+                        paymentMethod = request.PaymentMethod
+                    })
+                });
+            }
+
             _db.CustomerOrders.Add(order);
             return order;
         });
+    }
+
+    private async Task<SmartBasketWorkflow?> ValidateSmartBasket(
+        int userId,
+        CustomerCheckoutRequest request)
+    {
+        if (request.SmartBasketWorkflowId is not Guid workflowId)
+        {
+            if (request.SmartBasketRevision.HasValue ||
+                request.SmartBasketVersion.HasValue)
+            {
+                throw new BadHttpRequestException(
+                    "A Smart Basket ID is required with revision/version.", 400);
+            }
+
+            return null;
+        }
+
+        if (workflowId == Guid.Empty ||
+            request.SmartBasketRevision is not int revision ||
+            revision <= 0 ||
+            request.SmartBasketVersion is not Guid version ||
+            version == Guid.Empty ||
+            request.FromCart)
+        {
+            throw new BadHttpRequestException(
+                "Invalid Smart Basket checkout details. " +
+                "Smart Basket checkout must use FromCart=false.", 400);
+        }
+
+        // Uses the existing checkout transaction.
+        // Do not start another transaction here.
+        var matches = await _db.SmartBasketWorkflows
+            .FromSqlInterpolated($"""
+                SELECT * FROM "SmartBasketWorkflows"
+                WHERE "Id" = {workflowId}
+                  AND "CustomerId" = {userId}
+                FOR UPDATE
+                """)
+            .ToListAsync();
+
+        var workflow = matches.SingleOrDefault()
+            ?? throw new BadHttpRequestException(
+                "Smart Basket request not found.", 404);
+
+        var previousOrderId = await _db.CustomerOrders
+            .Where(order => order.SmartBasketWorkflowId == workflowId)
+            .Select(order => (int?)order.Id)
+            .SingleOrDefaultAsync();
+
+        if (previousOrderId.HasValue)
+        {
+            throw new BadHttpRequestException(
+                $"This basket already belongs to order #{previousOrderId.Value}. " +
+                "Open that order instead of creating another checkout.",
+                409);
+        }
+
+        if (workflow.Status != SmartBasketStatus.Approved ||
+            workflow.ProposalRevision != revision ||
+            workflow.Version != version)
+        {
+            throw new BadHttpRequestException(
+                "This basket is not approved at the supplied revision/version. " +
+                "Reload the basket.", 409);
+        }
+
+        var approved = await _db.SmartBasketApprovals.AnyAsync(approval =>
+            approval.WorkflowId == workflowId &&
+            approval.ProposalRevision == revision &&
+            approval.Decision == "Approved");
+
+        if (!approved)
+        {
+            throw new BadHttpRequestException(
+                "No approval exists for this revision.", 409);
+        }
+
+        var items = await _db.SmartBasketItems
+            .AsNoTracking()
+            .Where(item =>
+                item.WorkflowId == workflowId &&
+                item.ProposalRevision == revision)
+            .ToListAsync();
+
+        var exactMatch =
+            items.Count > 0 &&
+            items.Count == request.Items.Count &&
+            request.Items.All(line => items.Any(item =>
+                item.ProductId == line.ProductId &&
+                item.Quantity == line.Quantity &&
+                item.UnitPrice == line.UnitPrice));
+
+        if (!exactMatch)
+        {
+            throw new BadHttpRequestException(
+                "Checkout items must match the approved basket exactly.", 409);
+        }
+
+        using var constraints = JsonDocument.Parse(
+            workflow.ConstraintsJson);
+
+        if (!constraints.RootElement.TryGetProperty(
+                "categoryId", out var category) ||
+            !category.TryGetInt32(out var categoryId) ||
+            categoryId <= 0)
+        {
+            throw new BadHttpRequestException(
+                "The basket has no valid category.", 409);
+        }
+
+        var excludedIds = new HashSet<int>();
+
+        if (constraints.RootElement.TryGetProperty(
+                "excludedProductIds", out var exclusions))
+        {
+            foreach (var value in exclusions.EnumerateArray())
+                excludedIds.Add(value.GetInt32());
+        }
+
+        var ids = items.Select(item => item.ProductId).ToArray();
+
+        var products = await _db.Products
+            .AsNoTracking()
+            .Where(product => ids.Contains(product.Id))
+            .ToDictionaryAsync(product => product.Id);
+
+        foreach (var item in items)
+        {
+            if (!products.TryGetValue(item.ProductId, out var product) ||
+                !product.IsFood ||
+                product.Status != "APPROVED" ||
+                product.CategoryId != categoryId ||
+                excludedIds.Contains(product.Id) ||
+                product.StockQuantity < item.Quantity ||
+                product.Price != item.UnitPrice ||
+                product.Unit != item.Unit ||
+                product.Name != item.ProductName)
+            {
+                throw new BadHttpRequestException(
+                    "An approved product changed or is unavailable. " +
+                    "A new proposal is required.", 409);
+            }
+        }
+
+        var total = items.Sum(item => item.Quantity * item.UnitPrice);
+
+        if (workflow.Currency != "LKR" ||
+            total <= 0 ||
+            total != workflow.ProposedTotal ||
+            total > workflow.Budget)
+        {
+            throw new BadHttpRequestException(
+                "The approved basket total is invalid.", 409);
+        }
+
+        return workflow;
     }
 
     private async Task<bool> ConfirmStock(CustomerOrder order)

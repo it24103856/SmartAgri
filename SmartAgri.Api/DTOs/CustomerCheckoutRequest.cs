@@ -1,9 +1,20 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SmartAgri.Api.DTOs;
 
 public sealed class CustomerCheckoutRequest
 {
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+public Guid? SmartBasketWorkflowId { get; set; }
+
+[Range(1, int.MaxValue)]
+[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+public int? SmartBasketRevision { get; set; }
+
+[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+public Guid? SmartBasketVersion { get; set; }
     public Guid RequestId { get; set; }
 
     public bool FromCart { get; set; }

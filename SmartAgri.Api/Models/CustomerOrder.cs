@@ -5,6 +5,9 @@ namespace SmartAgri.Api.Models;
 
 public sealed class CustomerOrder
 {
+    public Guid? SmartBasketWorkflowId { get; set; }
+
+public int? SmartBasketRevision { get; set; }
     public int Id { get; set; }
     public int UserId { get; set; }
 

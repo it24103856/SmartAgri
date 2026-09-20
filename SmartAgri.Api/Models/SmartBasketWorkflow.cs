@@ -8,10 +8,12 @@ public static class SmartBasketStatus
     public const string Pending = "Pending";
     public const string Planning = "Planning";
     public const string Validating = "Validating";
+    public const string AwaitingCustomerReview = "AwaitingCustomerReview";
     public const string AwaitingApproval = "AwaitingApproval";
     public const string Approved = "Approved";
     public const string Rejected = "Rejected";
     public const string Failed = "Failed";
+    public const string Ordered = "Ordered";
 }
 
 public sealed class SmartBasketWorkflow

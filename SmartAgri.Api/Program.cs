@@ -155,6 +155,8 @@ builder.Services.AddTransient<EmailService>();
 builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddSingleton<PasswordResetQueue>();
 builder.Services.AddHostedService<PasswordResetWorker>();
+builder.Services.AddScoped<SmartBasketService>();
+builder.Services.AddScoped<AdminSmartBasketService>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -178,6 +180,39 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
+builder.Services.AddHttpClient<AgentValidationClient>(
+    (services, client) =>
+    {
+        var configuration =
+            services.GetRequiredService<IConfiguration>();
+
+        var baseUrl = configuration["AgentService:BaseUrl"]
+            ?? throw new InvalidOperationException(
+                "AgentService:BaseUrl is missing.");
+
+        client.BaseAddress = new Uri(baseUrl);
+        client.Timeout = TimeSpan.FromSeconds(15);
+    });
+
+builder.Services.AddHttpClient<AgentProposalClient>((services, client) =>
+{
+    var configuration = services
+        .GetRequiredService<IConfiguration>();
+
+    var baseUrl = configuration["AgentService:BaseUrl"]
+        ?? "http://127.0.0.1:8001/";
+
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(380);
+    client.MaxResponseContentBufferSize = 1_048_576;
+});
+
+builder.Services.AddScoped<SmartBasketProcessor>();
+
+if (builder.Configuration.GetValue<bool>("SmartBasket:WorkerEnabled"))
+{
+    builder.Services.AddHostedService<SmartBasketWorker>();
+}
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment() &&

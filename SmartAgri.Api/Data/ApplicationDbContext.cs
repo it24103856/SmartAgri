@@ -60,8 +60,8 @@ public DbSet<CustomerPayment> CustomerPayments =>
                     "CK_SmartBasketWorkflow_Status",
                     "\"Status\" IN (" +
                     "'Pending', 'Planning', 'Validating', " +
-                    "'AwaitingApproval', 'Approved', " +
-                    "'Rejected', 'Failed')");
+                    "'AwaitingCustomerReview', 'AwaitingApproval', " +
+                    "'Approved', 'Rejected', 'Failed', 'Ordered')");
             });
 
             entity.HasKey(value => value.Id);
@@ -175,6 +175,30 @@ public DbSet<CustomerPayment> CustomerPayments =>
                 .WithMany()
                 .HasForeignKey(value => value.AdminId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CustomerOrder>(entity =>
+        {
+            // One order per Smart Basket.
+            // Ordinary orders have NULL here.
+            entity.HasIndex(order => order.SmartBasketWorkflowId)
+                .IsUnique();
+
+            entity.HasOne<SmartBasketWorkflow>()
+                .WithMany()
+                .HasForeignKey(order => order.SmartBasketWorkflowId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.ToTable("CustomerOrders", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_CustomerOrder_SmartBasketLink",
+                    "(\"SmartBasketWorkflowId\" IS NULL " +
+                    "AND \"SmartBasketRevision\" IS NULL) OR " +
+                    "(\"SmartBasketWorkflowId\" IS NOT NULL " +
+                    "AND \"SmartBasketRevision\" IS NOT NULL " +
+                    "AND \"SmartBasketRevision\" > 0)");
+            });
         });
 
         modelBuilder.Entity<CustomerOrderStatusHistory>(entity =>
