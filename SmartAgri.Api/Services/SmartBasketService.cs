@@ -45,10 +45,10 @@ public sealed class SmartBasketService
 
 
         var objective = request.Objective.Trim();
-        if (request.CategoryId <= 0)
+        if (request.CategoryId is int selectedId && selectedId <= 0)
 {
     throw new BadHttpRequestException(
-        "Please select a category.",
+        "Invalid category.",
         400);
 }
 
@@ -74,15 +74,18 @@ public sealed class SmartBasketService
         if (existing is not null)
             return ValidateRetry(existing, hash);
 
+        if (request.CategoryId is int categoryId)
+        {
             var categoryExists = await _db.Categories
-    .AnyAsync(category => category.Id == request.CategoryId, ct);
+                .AnyAsync(category => category.Id == categoryId, ct);
 
-if (!categoryExists)
-{
-    throw new BadHttpRequestException(
-        "The selected category does not exist.",
-        400);
-}
+            if (!categoryExists)
+            {
+                throw new BadHttpRequestException(
+                    "The selected category does not exist.",
+                    400);
+            }
+        }
 
         var workflow = new SmartBasketWorkflow
         {
@@ -151,6 +154,13 @@ if (!categoryExists)
         SmartBasketWorkflow existing,
         string requestHash)
     {
+        if (existing.Status == SmartBasketStatus.Deleted)
+        {
+            throw new BadHttpRequestException(
+                "This basket was deleted. Submit a new request.",
+                409);
+        }
+
         if (existing.RequestHash != requestHash)
         {
             throw new BadHttpRequestException(
@@ -178,7 +188,9 @@ if (!categoryExists)
 
         var query = _db.SmartBasketWorkflows
             .AsNoTracking()
-            .Where(workflow => workflow.CustomerId == customerId);
+            .Where(workflow =>
+                workflow.CustomerId == customerId &&
+                workflow.Status != SmartBasketStatus.Deleted);
 
         var totalCount = await query.CountAsync(ct);
 
@@ -197,7 +209,17 @@ if (!categoryExists)
                 workflow.ProposedTotal,
                 workflow.ProposalRevision,
                 workflow.CreatedAt,
-                workflow.UpdatedAt
+                workflow.UpdatedAt,
+                canDelete =
+                    (
+                        workflow.Status == SmartBasketStatus.AwaitingCustomerReview ||
+                        workflow.Status == SmartBasketStatus.AwaitingApproval ||
+                        workflow.Status == SmartBasketStatus.Approved ||
+                        workflow.Status == SmartBasketStatus.Rejected ||
+                        workflow.Status == SmartBasketStatus.Failed
+                    )
+                    && !_db.CustomerOrders.Any(order =>
+                        order.SmartBasketWorkflowId == workflow.Id)
             })
             .ToListAsync(ct);
 
@@ -222,7 +244,8 @@ if (!categoryExists)
             .Include(value => value.Items)
             .SingleOrDefaultAsync(
                 value => value.Id == workflowId
-                    && value.CustomerId == customerId,
+                    && value.CustomerId == customerId
+                    && value.Status != SmartBasketStatus.Deleted,
                 ct)
             ?? throw new BadHttpRequestException(
                 "Smart Basket request not found.",
@@ -276,6 +299,111 @@ if (!categoryExists)
         };
     }
 
+
+    public async Task Delete(
+        int customerId,
+        Guid workflowId,
+        CancellationToken ct)
+    {
+        await RequireCustomer(customerId, ct);
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(ct);
+
+        // Use the same workflow lock as review and checkout.
+        var matches = await _db.SmartBasketWorkflows
+            .FromSqlInterpolated($"""
+                SELECT * FROM "SmartBasketWorkflows"
+                WHERE "Id" = {workflowId}
+                  AND "CustomerId" = {customerId}
+                FOR UPDATE
+                """)
+            .ToListAsync(ct);
+
+        var workflow = matches.SingleOrDefault()
+            ?? throw new BadHttpRequestException(
+                "Smart Basket request not found.", 404);
+
+        var hasOrder = await _db.CustomerOrders
+            .AnyAsync(
+                order => order.SmartBasketWorkflowId == workflowId,
+                ct);
+
+        if (hasOrder || workflow.Status == SmartBasketStatus.Ordered)
+        {
+            throw new BadHttpRequestException(
+                "This basket is linked to an order and cannot be deleted.",
+                409);
+        }
+
+        // Safe retry if the first response was lost.
+        if (workflow.Status == SmartBasketStatus.Deleted)
+        {
+            await transaction.CommitAsync(ct);
+            return;
+        }
+
+        var canDelete =
+            workflow.Status == SmartBasketStatus.AwaitingCustomerReview ||
+            workflow.Status == SmartBasketStatus.AwaitingApproval ||
+            workflow.Status == SmartBasketStatus.Approved ||
+            workflow.Status == SmartBasketStatus.Rejected ||
+            workflow.Status == SmartBasketStatus.Failed;
+
+        if (!canDelete)
+        {
+            throw new BadHttpRequestException(
+                "This basket is still being prepared. Try again when it finishes.",
+                409);
+        }
+
+        var previousStatus = workflow.Status;
+        var now = DateTime.UtcNow;
+
+        workflow.Status = SmartBasketStatus.Deleted;
+        workflow.Version = Guid.NewGuid();
+        workflow.UpdatedAt = now;
+        workflow.CompletedAt ??= now;
+
+        var lastSequence = await _db.SmartBasketSteps
+            .Where(step =>
+                step.WorkflowId == workflowId &&
+                step.Attempt == workflow.AttemptCount)
+            .MaxAsync(step => (int?)step.Sequence, ct) ?? -1;
+
+        _db.SmartBasketSteps.Add(new SmartBasketStep
+        {
+            WorkflowId = workflowId,
+            Attempt = workflow.AttemptCount,
+            Sequence = lastSequence + 1,
+            AgentName = "Customer",
+            ToolName = "delete_basket",
+            Status = "Completed",
+            StartedAt = now,
+            FinishedAt = now,
+            InputJson = JsonSerializer.Serialize(new
+            {
+                customerId,
+                previousStatus
+            }),
+            OutputJson = JsonSerializer.Serialize(new
+            {
+                status = SmartBasketStatus.Deleted
+            })
+        });
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new BadHttpRequestException(
+                "This basket changed. Refresh history and try again.",
+                409);
+        }
+    }
 
     public async Task Review(
     int customerId,
@@ -355,14 +483,8 @@ if (!categoryExists)
     using var constraints = JsonDocument.Parse(
         workflow.ConstraintsJson);
 
-    if (!constraints.RootElement.TryGetProperty(
-            "categoryId", out var categoryValue) ||
-        !categoryValue.TryGetInt32(out var categoryId) ||
-        categoryId <= 0)
-    {
-        throw new BadHttpRequestException(
-            "This basket has no category. Create a new request.", 409);
-    }
+    var categoryId = SmartBasketCategoryScope.Read(
+        constraints.RootElement);
 
     var excludedIds = new HashSet<int>();
 
@@ -386,7 +508,8 @@ if (!categoryExists)
     {
         if (!products.TryGetValue(line.ProductId, out var product) ||
             !product.IsFood ||
-            product.CategoryId != categoryId ||
+            (categoryId.HasValue &&
+             product.CategoryId != categoryId.Value) ||
             product.Status != "APPROVED" ||
             excludedIds.Contains(product.Id) ||
             product.Price <= 0 ||

@@ -14,6 +14,7 @@ public static class SmartBasketStatus
     public const string Rejected = "Rejected";
     public const string Failed = "Failed";
     public const string Ordered = "Ordered";
+    public const string Deleted = "Deleted";
 }
 
 public sealed class SmartBasketWorkflow

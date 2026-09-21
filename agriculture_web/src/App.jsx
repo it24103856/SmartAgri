@@ -6,6 +6,7 @@ import UserManagement from './pages/Users/UserManagement';
 import CategoryManagement from './pages/Categories/CategoryManagement';
 import ProductManagement from './pages/Products/ProductManagement';
 import OrderManagement from './pages/Orders/OrderManagement';
+import SmartBasketManagement from './pages/SmartBaskets/SmartBasketManagement';
 
 
 function App() {
@@ -38,9 +39,17 @@ function App() {
         {activeTab === 'categories' && <CategoryManagement />}
         {activeTab === 'products' && <ProductManagement />}
         {activeTab === 'orders' && <OrderManagement />}
+        {activeTab === 'ai-manage' && <SmartBasketManagement />}
         
 
-        {!['dashboard', 'users', 'categories', 'products', 'orders'].includes(activeTab) && (
+        {![
+          'dashboard',
+          'users',
+          'categories',
+          'products',
+          'orders',
+          'ai-manage',
+        ].includes(activeTab) && (
           <div className="p-4">
             <h1 className="text-2xl font-bold text-[#1E3A2B] capitalize">{activeTab} Section</h1>
             <p className="mt-2 text-gray-500">Module component under development...</p>

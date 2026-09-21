@@ -314,14 +314,8 @@ public sealed class AdminSmartBasketService
         using var constraints = JsonDocument.Parse(
             workflow.ConstraintsJson);
 
-        if (!constraints.RootElement.TryGetProperty(
-                "categoryId", out var category) ||
-            !category.TryGetInt32(out var categoryId) ||
-            categoryId <= 0)
-        {
-            throw new BadHttpRequestException(
-                "The basket has no valid category.", 409);
-        }
+        var categoryId = SmartBasketCategoryScope.Read(
+            constraints.RootElement);
 
         var excludedIds = new HashSet<int>();
 
@@ -359,7 +353,8 @@ public sealed class AdminSmartBasketService
             if (!products.TryGetValue(item.ProductId, out var product) ||
                 !product.IsFood ||
                 product.Status != "APPROVED" ||
-                product.CategoryId != categoryId ||
+                (categoryId.HasValue &&
+                 product.CategoryId != categoryId.Value) ||
                 excludedIds.Contains(product.Id) ||
                 item.Quantity <= 0 ||
                 product.StockQuantity < item.Quantity ||

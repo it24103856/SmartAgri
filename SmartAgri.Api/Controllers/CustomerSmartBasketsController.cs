@@ -82,6 +82,15 @@ public sealed class CustomerSmartBasketsController : ControllerBase
             ct));
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        CancellationToken ct)
+    {
+        await _service.Delete(CustomerId(), id, ct);
+        return NoContent();
+    }
+
     [HttpPut("{id:guid}/review")]
 public async Task<IActionResult> Review(
     Guid id,

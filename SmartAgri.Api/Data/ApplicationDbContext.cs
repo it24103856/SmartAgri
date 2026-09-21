@@ -61,7 +61,7 @@ public DbSet<CustomerPayment> CustomerPayments =>
                     "\"Status\" IN (" +
                     "'Pending', 'Planning', 'Validating', " +
                     "'AwaitingCustomerReview', 'AwaitingApproval', " +
-                    "'Approved', 'Rejected', 'Failed', 'Ordered')");
+                    "'Approved', 'Rejected', 'Failed', 'Ordered', 'Deleted')");
             });
 
             entity.HasKey(value => value.Id);

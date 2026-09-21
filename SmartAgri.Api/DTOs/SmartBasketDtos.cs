@@ -5,8 +5,9 @@ namespace SmartAgri.Api.DTOs;
 public sealed class CreateSmartBasketRequest : IValidatableObject
 {
 
+    // null = all food categories; positive ID = one category.
     [Range(1, int.MaxValue)]
-public int CategoryId { get; set; }
+    public int? CategoryId { get; set; }
     public Guid RequestId { get; set; }
 
     [Required]

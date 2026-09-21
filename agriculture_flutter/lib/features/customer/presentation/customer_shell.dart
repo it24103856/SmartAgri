@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/widgets/customer_animated_nav_bar.dart';
 import '../../../shared/widgets/customer_create_menu.dart';
 import '../../cart/presentation/cart_screen.dart';
+import '../../smart_basket/presentation/smart_basket_screen.dart';
 import '../../auth/data/models/user_model.dart';
 import '../../profile/data/customer_profile_service.dart';
 import '../../profile/presentation/customer_profile_screen.dart';
@@ -145,6 +146,21 @@ class _CustomerShellState extends State<CustomerShell> {
               ),
             ),
           ),
+          floatingActionButton:
+              keyboardOpen || _selectedIndex != 0 || _createMenuOpen
+              ? null
+              : FloatingActionButton.extended(
+                  heroTag: 'customer-smart-basket',
+                  onPressed: () {
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SmartBasketScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: const Text('Smart Basket'),
+                ),
           bottomNavigationBar: keyboardOpen
               ? null
               : CustomerAnimatedNavBar(

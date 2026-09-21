@@ -5,6 +5,7 @@ import '../../cart/data/cart_service.dart';
 import '../../../payments/presentation/payment_result_screen.dart';
 import '../../products/data/services/catalog_service.dart';
 import '../data/purchase_service.dart';
+import '../../smart_basket/data/smart_basket_service.dart';
 import 'dart:async';
 
 import '../../profile/data/customer_profile_service.dart';
@@ -12,8 +13,14 @@ import '../../profile/data/customer_profile_service.dart';
 class CheckoutScreen extends StatefulWidget {
   final int? productId;
   final int quantity;
+  final String? smartBasketId;
 
-  const CheckoutScreen({super.key, this.productId, this.quantity = 1});
+  const CheckoutScreen({
+    super.key,
+    this.productId,
+    this.quantity = 1,
+    this.smartBasketId,
+  }) : assert(productId == null || smartBasketId == null);
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -34,6 +41,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _profileNotice;
 
   late Future<CartData> _future;
+  Map<String, dynamic>? _approvedBasket;
 
   String _method = 'COD';
   bool _busy = false;
@@ -111,12 +119,101 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  Future<CartData> _load() {
-    final id = widget.productId;
+  Future<CartData> _load() async {
+    final basketId = widget.smartBasketId;
 
-    return id == null
-        ? CartService.instance.load(review: true)
-        : CartService.instance.buyNow(id, widget.quantity);
+    if (basketId == null) {
+      final id = widget.productId;
+
+      return id == null
+          ? await CartService.instance.load(review: true)
+          : await CartService.instance.buyNow(id, widget.quantity);
+    }
+
+    _approvedBasket = null;
+
+    final basket = await SmartBasketService.instance.get(basketId);
+
+    if (basket['linkedOrder'] is Map) {
+      final linked = basket['linkedOrder'] as Map;
+
+      throw SmartBasketException(
+        'This basket already has order #${linked['id']}. '
+        'Go back to the basket and choose View order.',
+        409,
+      );
+    }
+
+    if (basket['status'] != 'Approved') {
+      throw const SmartBasketException(
+        'This basket is not ready for checkout. '
+        'Go back and refresh its approval status.',
+        409,
+      );
+    }
+
+    final basketLines = (basket['items'] as List)
+        .map((value) => Map<String, dynamic>.from(value as Map))
+        .toList();
+
+    if (basketLines.isEmpty) {
+      throw const SmartBasketException('The approved basket is empty.');
+    }
+
+    final previewLines = <Map<String, dynamic>>[];
+    double subtotal = 0;
+
+    for (final line in basketLines) {
+      final productId = (line['productId'] as num).toInt();
+      final quantity = (line['quantity'] as num).toInt();
+      final price = (line['unitPrice'] as num).toDouble();
+
+      final product = await CatalogService.instance.product(productId);
+
+      if (!product.isFood ||
+          product.stockQuantity < quantity ||
+          (product.price * 100).round() != (price * 100).round() ||
+          product.unit != line['unit'] ||
+          product.name != line['productName']) {
+        throw const SmartBasketException(
+          'An approved product changed or has insufficient stock. '
+          'Go back to the basket and contact the administrator.',
+          409,
+        );
+      }
+
+      final lineTotal = quantity * price;
+      subtotal += lineTotal;
+
+      previewLines.add({
+        'productId': productId,
+        'quantity': quantity,
+        'stockQuantity': product.stockQuantity,
+        'name': product.name,
+        'unit': product.unit,
+        'imageUrl': product.thumbnail,
+        'unitPrice': price,
+        'lineTotal': lineTotal,
+        'available': true,
+      });
+    }
+
+    final approvedTotal = (basket['proposedTotal'] as num).toDouble();
+
+    if ((subtotal * 100).round() != (approvedTotal * 100).round()) {
+      throw const SmartBasketException(
+        'Basket total mismatch. Reload the basket.',
+        409,
+      );
+    }
+
+    _approvedBasket = basket;
+
+    return CartData.fromJson({
+      'items': previewLines,
+      'subtotal': subtotal,
+      'canCheckout': true,
+    });
   }
 
   @override
@@ -172,6 +269,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _submit(CartData cart) async {
     if (_busy) return;
 
+    if (widget.smartBasketId != null &&
+        _approvedBasket == null &&
+        _submittedRequest == null) {
+      setState(() {
+        _error = 'Reload the approved basket before checking out.';
+      });
+      return;
+    }
+
     if (_submittedRequest == null &&
         !(_form.currentState?.validate() ?? false)) {
       return;
@@ -179,7 +285,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     _submittedRequest ??= {
       'requestId': PurchaseService.newRequestId(),
-      'fromCart': widget.productId == null,
+      'fromCart': widget.productId == null && widget.smartBasketId == null,
+      if (_approvedBasket != null) ...{
+        'smartBasketWorkflowId': _approvedBasket!['id'],
+        'smartBasketRevision': _approvedBasket!['proposalRevision'],
+        'smartBasketVersion': _approvedBasket!['version'],
+      },
       'fullName': _name.text.trim(),
       'email': _email.text.trim(),
       'phone': _phone.text.trim(),

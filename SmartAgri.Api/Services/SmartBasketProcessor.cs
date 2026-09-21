@@ -124,7 +124,7 @@ public sealed class SmartBasketProcessor
     .AsNoTracking()
     .Include(product => product.Category)
     .Where(product =>
-        product.CategoryId == categoryId &&
+        (categoryId == null || product.CategoryId == categoryId) &&
         product.IsFood &&
         product.Status == "APPROVED" &&
         product.StockQuantity > 0 &&
@@ -172,15 +172,40 @@ public sealed class SmartBasketProcessor
 
             if (response.GetProperty("status").GetString() != "ProposalReady")
             {
-                if (response.TryGetProperty("steps", out var steps) &&
-                    steps.ValueKind == JsonValueKind.Array)
+                // Known diagnostic messages only; do not store arbitrary model output.
+                var knownReasons = new HashSet<string>(StringComparer.Ordinal)
                 {
-                    _logger.LogWarning(
-                        "Agent proposal failed after reporting {StepCount} steps.",
-                        steps.GetArrayLength());
+                    "No eligible food products are available.",
+                    "Catalog agent returned an unknown ID.",
+                    "Catalog selection contains a conflict.",
+                    "No products match this request.",
+                    "Model output was incomplete. Please retry.",
+                    "Local model timed out. Please retry.",
+                    "Local model is unavailable. Check Ollama and the model.",
+                    "Local model returned an invalid structured response."
+                };
+
+                var reason = "Agent rejected proposal.";
+
+                if (response.TryGetProperty("errors", out var errors) &&
+                    errors.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var entry in errors.EnumerateArray())
+                    {
+                        if (entry.ValueKind != JsonValueKind.String)
+                            continue;
+
+                        var message = entry.GetString();
+
+                        if (message is not null && knownReasons.Contains(message))
+                        {
+                            reason = message;
+                            break;
+                        }
+                    }
                 }
 
-                throw new InvalidOperationException("Agent rejected proposal.");
+                throw new InvalidOperationException(reason);
             }
 
             var validation = response.GetProperty("validation");
@@ -242,7 +267,8 @@ public sealed class SmartBasketProcessor
                 var quantity = line.GetProperty("quantity").GetInt32();
 
                 if (!freshProducts.TryGetValue(productId, out var product) ||
-    product.CategoryId != categoryId ||
+    (categoryId.HasValue &&
+     product.CategoryId != categoryId.Value) ||
     !product.IsFood ||
     product.Status != "APPROVED" ||
     quantity < 1 ||
@@ -347,9 +373,16 @@ public sealed class SmartBasketProcessor
             current.LeaseOwner = null;
             current.LeaseExpiresAt = null;
 
+            var diagnostic = error is InvalidOperationException
+                ? $"{error.GetType().Name}: {error.Message}"
+                : error.GetType().Name;
+
+            if (diagnostic.Length > 1900)
+                diagnostic = diagnostic[..1900];
+
             await FinishHistory(
                 current, attempt, result, "Failed",
-                error.GetType().Name, ct);
+                diagnostic, ct);
 
             try
             {
@@ -452,23 +485,11 @@ public sealed class SmartBasketProcessor
             });
         }
     }
-    private static int ReadCategoryId(string json)
-{
-    using var document = JsonDocument.Parse(json);
-
-    if (document.RootElement.ValueKind != JsonValueKind.Object ||
-        !document.RootElement.TryGetProperty(
-            "categoryId", out var category) ||
-        category.ValueKind != JsonValueKind.Number ||
-        !category.TryGetInt32(out var categoryId) ||
-        categoryId <= 0)
+    private static int? ReadCategoryId(string json)
     {
-        throw new InvalidOperationException(
-            "This request has no valid category. Submit a new request.");
+        using var document = JsonDocument.Parse(json);
+        return SmartBasketCategoryScope.Read(document.RootElement);
     }
-
-    return categoryId;
-}
 
     private static int[] ReadExclusions(string json)
     {
