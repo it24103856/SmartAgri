@@ -82,6 +82,17 @@ public sealed class CustomerSmartBasketsController : ControllerBase
             ct));
     }
 
+    [HttpGet("{id:guid}/addable-products")]
+    public async Task<IActionResult> AddableProducts(
+        Guid id,
+        CancellationToken ct)
+    {
+        return Ok(await _service.AddableProducts(
+            CustomerId(),
+            id,
+            ct));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,

@@ -5,6 +5,7 @@ import '../../orders/presentation/checkout_screen.dart';
 import '../../orders/presentation/purchase_order_screen.dart';
 import '../data/smart_basket_service.dart';
 import '../data/smart_basket_delete_service.dart';
+import 'smart_basket_product_picker.dart';
 
 String basketStatus(String status) => switch (status) {
   'Pending' => 'Waiting to start',
@@ -499,6 +500,83 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
             (line['unitPrice'] as num).toDouble(),
   );
 
+  Future<void> _addProduct() async {
+    final basket = _basket;
+
+    if (_busy ||
+        basket == null ||
+        _pendingReview != null ||
+        basket['status'] != 'AwaitingCustomerReview') {
+      return;
+    }
+
+    if (_lines.length >= 50) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A basket can contain up to 50 products.'),
+        ),
+      );
+      return;
+    }
+
+    final budgetMinor = ((basket['budget'] as num).toDouble() * 100).round();
+    final remainingMinor = budgetMinor - (_total * 100).round();
+
+    if (remainingMinor <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Remove a product or reduce quantities to free some budget.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _busy = true);
+
+    try {
+      final product = await Navigator.of(context).push<Map<String, dynamic>>(
+        MaterialPageRoute<Map<String, dynamic>>(
+          builder: (_) => SmartBasketProductPicker(
+            workflowId: widget.id,
+            version: basket['version'] as String,
+            existingIds: _lines
+                .map((line) => (line['productId'] as num).toInt())
+                .toSet(),
+            remainingMinor: remainingMinor,
+          ),
+        ),
+      );
+
+      if (!mounted || product == null) return;
+
+      final productId = (product['productId'] as num).toInt();
+
+      if (_lines.any(
+        (line) => (line['productId'] as num).toInt() == productId,
+      )) {
+        return;
+      }
+
+      setState(() {
+        _lines.add({
+          'productId': productId,
+          'productName': product['productName'],
+          'unit': product['unit'],
+          'unitPrice': product['unitPrice'],
+          'quantity': 1,
+          'lineTotal': product['unitPrice'],
+        });
+
+        _dirty = true;
+        _error = null;
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _save(bool submit) async {
     if (_busy || _basket == null || _lines.isEmpty) return;
 
@@ -617,6 +695,14 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                   'This proposal was not approved. '
                   'Contact the administrator or create a new request.',
                 ),
+              if (editable) ...[
+                OutlinedButton.icon(
+                  onPressed: canEdit && _lines.length < 50 ? _addProduct : null,
+                  icon: const Icon(Icons.add_shopping_cart),
+                  label: const Text('Add products'),
+                ),
+                const SizedBox(height: 12),
+              ],
               for (final line in _lines)
                 Card(
                   child: Padding(

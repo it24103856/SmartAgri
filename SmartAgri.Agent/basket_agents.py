@@ -714,6 +714,14 @@ async def generate_proposal(request: ProposalRequest):
         return {
             "workflow_id": str(request.workflow_id),
             "status": "ProposalReady",
+            "editing": {
+                "allowed_product_ids": [
+                    product.id for product in allowed_products
+                ],
+                "excluded_product_ids": sorted(
+                    excluded_ids | set(request.excluded_product_ids)
+                ),
+            },
             "plan": plan.model_dump(),
             "validation": validation.model_dump(mode="json"),
             "steps": steps,

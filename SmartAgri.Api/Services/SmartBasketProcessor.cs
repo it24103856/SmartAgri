@@ -312,6 +312,73 @@ public sealed class SmartBasketProcessor
                 throw new InvalidOperationException("Proposal total is invalid.");
             }
 
+            var editing = response.GetProperty("editing");
+
+            var allowedEditIds = editing
+                .GetProperty("allowed_product_ids")
+                .EnumerateArray()
+                .Select(value => value.GetInt32())
+                .ToArray();
+
+            var agentExcludedIds = editing
+                .GetProperty("excluded_product_ids")
+                .EnumerateArray()
+                .Select(value => value.GetInt32())
+                .ToArray();
+
+            var catalogIds = catalog
+                .Select(product => product.Id)
+                .ToHashSet();
+
+            var savedExcludedIds = excludedIds
+                .Concat(agentExcludedIds)
+                .Distinct()
+                .ToArray();
+
+            if (allowedEditIds.Length == 0 ||
+                allowedEditIds.Length > 50 ||
+                allowedEditIds.Distinct().Count() != allowedEditIds.Length ||
+                allowedEditIds.Any(id =>
+                    !catalogIds.Contains(id) ||
+                    savedExcludedIds.Contains(id)) ||
+                ids.Any(id => !allowedEditIds.Contains(id)) ||
+                agentExcludedIds.Any(id =>
+                    id <= 0 ||
+                    (!catalogIds.Contains(id) && !excludedIds.Contains(id))))
+            {
+                throw new InvalidOperationException(
+                    "Agent returned invalid editing constraints.");
+            }
+
+            // Preserve existing category scope and other constraints.
+            var savedConstraints =
+                JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+                    current.ConstraintsJson)
+                ?? throw new InvalidOperationException(
+                    "Basket constraints are missing.");
+
+            savedConstraints["excludedProductIds"] =
+                JsonSerializer.SerializeToElement(savedExcludedIds);
+
+            // Snapshot the catalog details that the agent actually saw.
+            savedConstraints["addableProducts"] =
+                JsonSerializer.SerializeToElement(
+                    catalog
+                        .Where(product =>
+                            allowedEditIds.Contains(product.Id))
+                        .Select(product => new
+                        {
+                            productId = product.Id,
+                            productName = product.Name,
+                            unit = product.Unit,
+                            unitPrice = product.Price,
+                            categoryId = product.CategoryId
+                        })
+                        .ToArray());
+
+            current.ConstraintsJson =
+                JsonSerializer.Serialize(savedConstraints);
+
             current.PlanJson = response.GetProperty("plan").GetRawText();
             current.ValidationJson = validation.GetRawText();
             current.ProposedTotal = totalMinor / 100m;

@@ -405,6 +405,123 @@ public sealed class SmartBasketService
         }
     }
 
+    private sealed record AddableProductSnapshot(
+        int ProductId,
+        string ProductName,
+        string Unit,
+        decimal UnitPrice,
+        int CategoryId);
+
+    private static Dictionary<int, AddableProductSnapshot>
+        ReadAddableProducts(JsonElement constraints)
+    {
+        if (!constraints.TryGetProperty(
+                "addableProducts", out var products))
+        {
+            return new Dictionary<int, AddableProductSnapshot>();
+        }
+
+        return products.EnumerateArray()
+            .Select(value => new AddableProductSnapshot(
+                value.GetProperty("productId").GetInt32(),
+                value.GetProperty("productName").GetString()!,
+                value.GetProperty("unit").GetString()!,
+                value.GetProperty("unitPrice").GetDecimal(),
+                value.GetProperty("categoryId").GetInt32()))
+            .ToDictionary(value => value.ProductId);
+    }
+
+    public async Task<object> AddableProducts(
+        int customerId,
+        Guid workflowId,
+        CancellationToken ct)
+    {
+        await RequireCustomer(customerId, ct);
+
+        var workflow = await _db.SmartBasketWorkflows
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                value => value.Id == workflowId &&
+                    value.CustomerId == customerId &&
+                    value.Status != SmartBasketStatus.Deleted,
+                ct)
+            ?? throw new BadHttpRequestException(
+                "Smart Basket request not found.", 404);
+
+        if (workflow.Status != SmartBasketStatus.AwaitingCustomerReview)
+        {
+            throw new BadHttpRequestException(
+                "Products can only be added during customer review.",
+                409);
+        }
+
+        using var document = JsonDocument.Parse(
+            workflow.ConstraintsJson);
+
+        var root = document.RootElement;
+
+        if (!root.TryGetProperty("addableProducts", out _))
+        {
+            throw new BadHttpRequestException(
+                "Create a new basket to use Add products. " +
+                "This older basket does not contain the required product choices.",
+                409);
+        }
+
+        var snapshots = ReadAddableProducts(root);
+        var categoryId = SmartBasketCategoryScope.Read(root);
+
+        var excludedIds = root.TryGetProperty(
+                "excludedProductIds", out var exclusions)
+            ? exclusions.EnumerateArray()
+                .Select(value => value.GetInt32()).ToArray()
+            : Array.Empty<int>();
+
+        var allowedIds = snapshots.Keys.ToArray();
+
+        var products = await _db.Products
+            .AsNoTracking()
+            .Where(product =>
+                allowedIds.Contains(product.Id) &&
+                !excludedIds.Contains(product.Id) &&
+                product.IsFood &&
+                product.Status == "APPROVED" &&
+                product.StockQuantity > 0 &&
+                product.Price > 0 &&
+                (!categoryId.HasValue ||
+                    product.CategoryId == categoryId.Value))
+            .OrderBy(product => product.Name)
+            .ThenBy(product => product.Id)
+            .ToListAsync(ct);
+
+        // Hide products whose details changed after agent validation.
+        var items = products
+            .Where(product =>
+            {
+                var snapshot = snapshots[product.Id];
+
+                return product.Name == snapshot.ProductName &&
+                    product.Unit == snapshot.Unit &&
+                    product.Price == snapshot.UnitPrice &&
+                    product.CategoryId == snapshot.CategoryId;
+            })
+            .Select(product => new
+            {
+                productId = product.Id,
+                productName = product.Name,
+                unit = product.Unit,
+                unitPrice = product.Price,
+                stockQuantity = product.StockQuantity
+            })
+            .ToArray();
+
+        return new
+        {
+            workflow.Version,
+            items
+        };
+    }
+
     public async Task Review(
     int customerId,
     Guid workflowId,
@@ -473,15 +590,21 @@ public sealed class SmartBasketService
             item.ProposalRevision == workflow.ProposalRevision)
         .ToDictionaryAsync(item => item.ProductId, ct);
 
-    // This endpoint currently supports quantity changes and removals.
-    if (ids.Any(id => !previousItems.ContainsKey(id)))
-    {
-        throw new BadHttpRequestException(
-            "New products require a new validated proposal.", 400);
-    }
-
     using var constraints = JsonDocument.Parse(
         workflow.ConstraintsJson);
+
+    var addableProducts =
+        ReadAddableProducts(constraints.RootElement);
+
+    if (ids.Any(id =>
+            !previousItems.ContainsKey(id) &&
+            !addableProducts.ContainsKey(id)))
+    {
+        throw new BadHttpRequestException(
+            "A product is not eligible for this basket. " +
+            "Choose a product from Add products.",
+            400);
+    }
 
     var categoryId = SmartBasketCategoryScope.Read(
         constraints.RootElement);
@@ -520,15 +643,31 @@ public sealed class SmartBasketService
                 409);
         }
 
-        var previous = previousItems[product.Id];
-
-        // Do not silently accept a changed price or selling unit.
-        if (product.Price != previous.UnitPrice ||
-            product.Unit != previous.Unit ||
-            product.Name != previous.ProductName)
+        if (previousItems.TryGetValue(product.Id, out var previous))
         {
-            throw new BadHttpRequestException(
-                "Product details changed. Generate a new proposal.", 409);
+            if (product.Price != previous.UnitPrice ||
+                product.Unit != previous.Unit ||
+                product.Name != previous.ProductName)
+            {
+                throw new BadHttpRequestException(
+                    "Product details changed. Generate a new proposal.",
+                    409);
+            }
+        }
+        else
+        {
+            if (!addableProducts.TryGetValue(
+                    product.Id, out var snapshot) ||
+                product.Price != snapshot.UnitPrice ||
+                product.Unit != snapshot.Unit ||
+                product.Name != snapshot.ProductName ||
+                product.CategoryId != snapshot.CategoryId)
+            {
+                throw new BadHttpRequestException(
+                    "The added product changed or is no longer eligible. " +
+                    "Generate a new proposal.",
+                    409);
+            }
         }
 
         total += product.Price * line.Quantity;

@@ -82,6 +82,14 @@ class SmartBasketService {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  Future<Map<String, dynamic>> addableProducts(String id) async {
+    final data = await _send(
+      () => _dio.get<dynamic>('/customer-smart-baskets/$id/addable-products'),
+    );
+
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   Future<Map<String, dynamic>> review(
     String id,
     Map<String, dynamic> body,
