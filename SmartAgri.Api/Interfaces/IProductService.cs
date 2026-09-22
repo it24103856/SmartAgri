@@ -22,4 +22,16 @@ public interface IProductService
         int id,
         ReviewProductDto dto,
         bool approve);
+
+        Task<object> GetFarmerProductsAsync(
+    int farmerId, int page, int pageSize);
+
+Task<ProductResponseDto> GetFarmerProductAsync(
+    int farmerId, int id);
+
+Task<ProductResponseDto> CreateFarmerProductAsync(
+    int farmerId, SaveProductDto dto);
+
+Task<ProductResponseDto> UpdateFarmerProductAsync(
+    int farmerId, int id, UpdateProductDto dto);
 }

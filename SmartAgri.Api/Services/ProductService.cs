@@ -17,8 +17,7 @@ public class ProductOperationException : Exception
     }
 }
 
-public class ProductService : IProductService
-{
+public partial class ProductService : IProductService{
     private readonly ApplicationDbContext _db;
     private readonly ProductImageStore _images;
 
