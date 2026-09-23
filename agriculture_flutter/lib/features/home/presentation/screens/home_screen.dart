@@ -1,14 +1,33 @@
 import 'package:flutter/material.dart';
 import '../../../customer/presentation/customer_shell.dart';
+import '../../../farmer/presentation/farmer_shell.dart';
 import '../../../auth/data/services/auth_service.dart';
 
-/// Temporary landing screen after login — replace with the real
-/// Farmer/Customer dashboards once those features are built.
+/// Landing screen after login — routes to the role-specific shell.
 class HomeScreen extends StatelessWidget {
   final String fullName;
   final String role;
 
   const HomeScreen({super.key, required this.fullName, required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (role.toUpperCase()) {
+      case 'CUSTOMER':
+        return CustomerShell(fullName: fullName);
+      case 'FARMER':
+        return FarmerShell(fullName: fullName);
+      default:
+        return _UnsupportedRoleScreen(fullName: fullName, role: role);
+    }
+  }
+}
+
+class _UnsupportedRoleScreen extends StatelessWidget {
+  final String fullName;
+  final String role;
+
+  const _UnsupportedRoleScreen({required this.fullName, required this.role});
 
   Future<void> _logout(BuildContext context) async {
     await AuthService.instance.logout();
@@ -16,9 +35,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (role.toUpperCase() == 'CUSTOMER') {
-      return CustomerShell(fullName: fullName);
-    }
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9F8),
       appBar: AppBar(
@@ -32,25 +48,9 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              role == 'FARMER' ? Icons.agriculture : Icons.shopping_bag,
-              size: 64,
-              color: const Color(0xFF3B6E52),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '$role Dashboard',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'This is a placeholder — build the real dashboard here.',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
+        child: Text(
+          'No dashboard is available yet for the "$role" role.',
+          style: const TextStyle(color: Colors.grey),
         ),
       ),
     );

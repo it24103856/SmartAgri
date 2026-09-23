@@ -9,7 +9,7 @@ namespace SmartAgri.Api.Controllers;
 
 [ApiController]
 [Route("api/catalog")]
-[Authorize(Roles = "CUSTOMER,ADMIN")]
+[Authorize(Roles = "CUSTOMER,ADMIN,FARMER")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class CatalogController : ControllerBase
 {
@@ -29,13 +29,13 @@ public sealed class CatalogController : ControllerBase
             return false;
         }
 
-        return await _db.Users
-            .AsNoTracking()
-            .AnyAsync(
-                u => u.Id == userId
-                     && u.Status == "ACTIVE"
-                     && (u.Role == "CUSTOMER" || u.Role == "ADMIN"),
-                ct);
+       return await _db.Users
+    .AsNoTracking()
+    .AnyAsync(
+        u => u.Id == userId
+             && u.Status == "ACTIVE"
+             && (u.Role == "CUSTOMER" || u.Role == "ADMIN" || u.Role == "FARMER"),
+        ct);
     }
 
     private IQueryable<Product> ApprovedProducts()
