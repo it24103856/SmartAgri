@@ -16,6 +16,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<Cart> Carts { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
+    public DbSet<Farm> Farms => Set<Farm>();
 
    public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
 
@@ -357,6 +358,55 @@ modelBuilder.Entity<CartItem>(entity =>
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(p => new { p.Status, p.CreatedAt });
+        });
+
+        modelBuilder.Entity<Farm>(entity =>
+        {
+            entity.ToTable("Farms");
+            entity.HasKey(f => f.Id);
+
+            entity.Property(f => f.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(f => f.Location)
+                .HasMaxLength(200);
+
+            entity.Property(f => f.AreaUnit)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("Acres");
+
+            entity.Property(f => f.TotalArea)
+                .HasPrecision(10, 2);
+
+            entity.Property(f => f.SoilType)
+                .HasMaxLength(50);
+
+            entity.Property(f => f.IrrigationType)
+                .HasMaxLength(50);
+
+            entity.Property(f => f.MainCrops)
+                .HasMaxLength(250);
+
+            entity.Property(f => f.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(f => f.Status)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("ACTIVE");
+
+            entity.Property(f => f.ImageUrls)
+                .HasColumnType("text[]")
+                .HasDefaultValueSql("ARRAY[]::text[]");
+
+            entity.HasOne(f => f.Farmer)
+                .WithMany()
+                .HasForeignKey(f => f.FarmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(f => f.FarmerId);
         });
     }
 }

@@ -24,6 +24,8 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddSingleton<ProductImageStore>();
 builder.Services.AddSingleton<CategoryImageStore>();
 builder.Services.AddSingleton<ProfileImageStore>();
+builder.Services.AddScoped<IFarmService, FarmService>();
+builder.Services.AddSingleton<FarmImageStore>();
 
 // 2. Swagger Configuration with JWT Authorize Button
 builder.Services.AddSwaggerGen(options =>
@@ -292,6 +294,14 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(profileImageStore.RootDirectory),
     RequestPath = "/uploads/profiles",
+    OnPrepareResponse = context => context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
+
+var farmImageStore = app.Services.GetRequiredService<FarmImageStore>();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(farmImageStore.RootDirectory),
+    RequestPath = "/uploads/farms",
     OnPrepareResponse = context => context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
 
