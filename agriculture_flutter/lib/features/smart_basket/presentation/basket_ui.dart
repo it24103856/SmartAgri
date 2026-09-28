@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../shared/widgets/catalog_common.dart';
 
-export '../../../shared/widgets/catalog_common.dart' show GlassCatalogCard;
+export '../../../shared/widgets/catalog_common.dart'
+    show GlassCatalogCard, CatalogImage;
 
 class BasketScaffold extends StatelessWidget {
   final String title;

@@ -185,10 +185,14 @@ class _SmartBasketProductPickerState extends State<SmartBasketProductPicker> {
                             ),
                             radius: 20,
                             child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: colors.primaryContainer,
-                                foregroundColor: colors.onPrimaryContainer,
-                                child: const Icon(Icons.eco_outlined),
+                              leading: ClipOval(
+                                child: SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: CatalogImage(
+                                    product['imageUrl'] as String?,
+                                  ),
+                                ),
                               ),
                               title: Text(product['productName'] as String),
                               subtitle: Text(

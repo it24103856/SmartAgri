@@ -651,6 +651,7 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
           'unitPrice': product['unitPrice'],
           'quantity': 1,
           'lineTotal': product['unitPrice'],
+          'imageUrl': product['imageUrl'],
         });
 
         _dirty = true;
@@ -797,7 +798,8 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                     Text(
                       switch (basket['generationMode']) {
                         'ai' => 'Prepared with AI (Gemini)',
-                        'catalog_fallback' => 'Prepared from catalog (fallback)',
+                        'catalog_fallback' =>
+                          'Prepared from catalog (fallback)',
                         _ => 'Preparation source not recorded',
                       },
                       style: TextStyle(
@@ -897,13 +899,36 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            line['productName'] as String,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            '${basketMoney(line['unitPrice'] as num)}'
-                            ' / ${line['unit']}',
+                          Row(
+                            children: [
+                              ClipOval(
+                                child: SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: CatalogImage(
+                                    line['imageUrl'] as String?,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      line['productName'] as String,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
+                                    ),
+                                    Text(
+                                      '${basketMoney(line['unitPrice'] as num)}'
+                                      ' / ${line['unit']}',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                           Row(
                             children: [

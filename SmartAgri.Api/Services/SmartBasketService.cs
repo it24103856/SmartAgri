@@ -265,6 +265,17 @@ public sealed class SmartBasketService
             })
             .SingleOrDefaultAsync(ct);
 
+        var productIds = workflow.Items
+            .Where(i => i.ProposalRevision == workflow.ProposalRevision)
+            .Select(i => i.ProductId)
+            .Distinct()
+            .ToArray();
+
+        var productImages = await _db.Products
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.ImageUrl })
+            .ToDictionaryAsync(p => p.Id, p => p.ImageUrl, ct);
+
         // Return customer-facing fields only.
         // Internal agent inputs, errors, leases and hashes stay private.
         return new
@@ -296,7 +307,8 @@ public sealed class SmartBasketService
                     item.Unit,
                     item.Quantity,
                     item.UnitPrice,
-                    item.LineTotal
+                    item.LineTotal,
+                    imageUrl = productImages.GetValueOrDefault(item.ProductId)
                 })
                 .ToArray()
         };
@@ -514,7 +526,8 @@ public sealed class SmartBasketService
                 productName = product.Name,
                 unit = product.Unit,
                 unitPrice = product.Price,
-                stockQuantity = product.StockQuantity
+                stockQuantity = product.StockQuantity,
+                imageUrl = product.ImageUrl
             })
             .ToArray();
 
