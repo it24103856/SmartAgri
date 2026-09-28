@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/farmer_ui.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -223,190 +224,217 @@ class _FarmFormScreenState extends State<FarmFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Edit Farm' : 'Add New Farm'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              _photoSection(),
-              const SizedBox(height: 18),
-              TextFormField(
-                controller: _name,
-                decoration: const InputDecoration(
-                  labelText: 'Farm Name *',
-                  hintText: 'e.g. Green Valley Farm',
-                  prefixIcon: Icon(Icons.landscape_outlined),
+    return FarmerPage(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(_isEdit ? 'Edit Farm' : 'Add New Farm'),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              children: [
+                FarmerHero(
+                  eyebrow: 'Your farmland',
+                  title: _isEdit
+                      ? 'Keep your farm up to date.'
+                      : 'A new place to grow.',
+                  subtitle:
+                      'Add photos and a few details to keep your land organised.',
+                  icon: Icons.landscape_outlined,
                 ),
-                validator: _validateName,
-                enabled: !_saving,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _location,
-                decoration: const InputDecoration(
-                  labelText: 'Location / Address',
-                  hintText: 'e.g. Kurunegala, North Western',
-                  prefixIcon: Icon(Icons.location_on_outlined),
+                const FarmerSection(
+                  '01  Farm photos',
+                  subtitle: 'Give your farm a recognisable cover photo.',
                 ),
-                enabled: !_saving,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextFormField(
-                      controller: _totalArea,
-                      decoration: const InputDecoration(
-                        labelText: 'Total Area *',
-                        hintText: 'e.g. 2.5',
-                        prefixIcon: Icon(Icons.square_foot_outlined),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: _validateArea,
-                      enabled: !_saving,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _areaUnit,
-                      decoration: const InputDecoration(labelText: 'Unit'),
-                      items: _areaUnits
-                          .map(
-                            (u) => DropdownMenuItem(value: u, child: Text(u)),
-                          )
-                          .toList(),
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _areaUnit = v!),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: _soilType,
-                decoration: const InputDecoration(
-                  labelText: 'Soil Type (පස වර්ගය)',
-                  prefixIcon: Icon(Icons.grass_outlined),
+                _photoSection(),
+                const FarmerSection(
+                  '02  Farm overview',
+                  subtitle: 'The essentials about your land.',
                 ),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text('Select soil type (Optional)'),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _name,
+                  decoration: const InputDecoration(
+                    labelText: 'Farm Name *',
+                    hintText: 'e.g. Green Valley Farm',
+                    prefixIcon: Icon(Icons.landscape_outlined),
                   ),
-                  ..._soilTypes.map(
-                    (s) => DropdownMenuItem<String>(value: s, child: Text(s)),
-                  ),
-                ],
-                onChanged: _saving
-                    ? null
-                    : (v) => setState(() => _soilType = v),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: _irrigationType,
-                decoration: const InputDecoration(
-                  labelText: 'Irrigation Type (ජල සම්පාදනය)',
-                  prefixIcon: Icon(Icons.water_drop_outlined),
+                  validator: _validateName,
+                  enabled: !_saving,
                 ),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text('Select irrigation type (Optional)'),
-                  ),
-                  ..._irrigationTypes.map(
-                    (i) => DropdownMenuItem<String>(value: i, child: Text(i)),
-                  ),
-                ],
-                onChanged: _saving
-                    ? null
-                    : (v) => setState(() => _irrigationType = v),
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _mainCrops,
-                decoration: const InputDecoration(
-                  labelText: 'Main Crops (ප්‍රධාන බෝග)',
-                  hintText: 'e.g. Paddy, Coconut, Banana, Vegetables',
-                  prefixIcon: Icon(Icons.eco_outlined),
-                ),
-                enabled: !_saving,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _description,
-                decoration: const InputDecoration(
-                  labelText: 'Description / Notes (Optional)',
-                  hintText:
-                      'Additional details about soil condition, water source, etc.',
-                  alignLabelWithHint: true,
-                ),
-                maxLines: 3,
-                enabled: !_saving,
-              ),
-              if (_error != null) ...[
                 const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3),
+                TextFormField(
+                  controller: _location,
+                  decoration: const InputDecoration(
+                    labelText: 'Location / Address',
+                    hintText: 'e.g. Kurunegala, North Western',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                  enabled: !_saving,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextFormField(
+                        controller: _totalArea,
+                        decoration: const InputDecoration(
+                          labelText: 'Total Area *',
+                          hintText: 'e.g. 2.5',
+                          prefixIcon: Icon(Icons.square_foot_outlined),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: _validateArea,
+                        enabled: !_saving,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: _areaUnit,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: _areaUnits
+                            .map(
+                              (u) => DropdownMenuItem(value: u, child: Text(u)),
+                            )
+                            .toList(),
+                        onChanged: _saving
+                            ? null
+                            : (v) => setState(() => _areaUnit = v!),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const FarmerSection(
+                  '03  Soil & water',
+                  subtitle: 'Record the growing conditions on your farm.',
+                ),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _soilType,
+                  decoration: const InputDecoration(
+                    labelText: 'Soil Type (පස වර්ගය)',
+                    prefixIcon: Icon(Icons.grass_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Select soil type (Optional)'),
+                    ),
+                    ..._soilTypes.map(
+                      (s) => DropdownMenuItem<String>(value: s, child: Text(s)),
+                    ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (v) => setState(() => _soilType = v),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: _irrigationType,
+                  decoration: const InputDecoration(
+                    labelText: 'Irrigation Type (ජල සම්පාදනය)',
+                    prefixIcon: Icon(Icons.water_drop_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Select irrigation type (Optional)'),
+                    ),
+                    ..._irrigationTypes.map(
+                      (i) => DropdownMenuItem<String>(value: i, child: Text(i)),
+                    ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (v) => setState(() => _irrigationType = v),
+                ),
+                const SizedBox(height: 14),
+                const FarmerSection('04  Crops & notes'),
+                TextFormField(
+                  controller: _mainCrops,
+                  decoration: const InputDecoration(
+                    labelText: 'Main Crops (ප්‍රධාන බෝග)',
+                    hintText: 'e.g. Paddy, Coconut, Banana, Vegetables',
+                    prefixIcon: Icon(Icons.eco_outlined),
+                  ),
+                  enabled: !_saving,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _description,
+                  decoration: const InputDecoration(
+                    labelText: 'Description / Notes (Optional)',
+                    hintText:
+                        'Additional details about soil condition, water source, etc.',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 3,
+                  enabled: !_saving,
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
+                ],
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _saving ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _isEdit ? 'Save Changes' : 'Register Farm',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ],
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _saving ? null : _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        _isEdit ? 'Save Changes' : 'Register Farm',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -420,12 +448,14 @@ class _FarmFormScreenState extends State<FarmFormScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Farm Photos (Max 4, Optional)',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontSize: 14,
+            const Expanded(
+              child: Text(
+                'Farm Photos (Max 4, Optional)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                ),
               ),
             ),
             Text(

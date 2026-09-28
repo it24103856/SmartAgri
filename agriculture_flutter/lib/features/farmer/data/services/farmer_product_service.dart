@@ -156,6 +156,16 @@ class FarmerProductService {
     );
   }
 
+  /// Load every page so local search and status totals cover the full inventory.
+  Future<List<FarmerProduct>> listAll() async {
+    final first = await list(pageSize: 50);
+    final items = [...first.items];
+    for (var page = 2; page <= first.totalPages; page++) {
+      items.addAll((await list(page: page, pageSize: 50)).items);
+    }
+    return {for (final item in items) item.id: item}.values.toList();
+  }
+
   Future<FarmerProduct> get(int id) {
     return _send(
       () => _dio.get<dynamic>('/farmer-products/$id'),

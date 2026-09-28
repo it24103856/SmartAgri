@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/farmer_ui.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -281,156 +282,171 @@ class _FarmerProductFormScreenState extends State<FarmerProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Edit product' : 'Add product'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              if (_isEdit)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.soft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    'Saving changes sends this product back for admin '
-                    'review. It will not show in the customer catalog '
-                    'until approved again.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
+    return FarmerPage(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(_isEdit ? 'Edit product' : 'Add product'),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              children: [
+                FarmerHero(
+                  eyebrow: 'Your harvest',
+                  title: _isEdit
+                      ? 'Refresh your listing.'
+                      : 'Bring your harvest to market.',
+                  subtitle:
+                      'Clear photos and accurate details help customers choose your produce.',
+                  icon: Icons.eco_outlined,
                 ),
-              _photoSection(),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _name,
-                decoration: const InputDecoration(labelText: 'Product name'),
-                validator: (v) => _required(v, 'Product name'),
-                enabled: !_saving,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _description,
-                decoration: const InputDecoration(labelText: 'Description'),
-                maxLines: 3,
-                enabled: !_saving,
-              ),
-              const SizedBox(height: 12),
-              _categoryDropdown(),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _price,
-                      decoration: const InputDecoration(
-                        labelText: 'Price (Rs.)',
+                const FarmerSection('01  Product photos'),
+                if (_isEdit)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.soft,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Saving changes sends this product back for admin '
+                      'review. It will not show in the customer catalog '
+                      'until approved again.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: _validatePrice,
-                      enabled: !_saving,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _unit,
-                      decoration: const InputDecoration(labelText: 'Unit'),
-                      items: _units
-                          .map(
-                            (unit) => DropdownMenuItem(
-                              value: unit,
-                              child: Text(unit),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _saving
-                          ? null
-                          : (value) => setState(() => _unit = value!),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _stockQuantity,
-                      decoration: const InputDecoration(
-                        labelText: 'Stock quantity',
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: _validateStock,
-                      enabled: !_saving,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _weightKg,
-                      decoration: const InputDecoration(
-                        labelText: 'Weight (kg, optional)',
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: _validateWeight,
-                      enabled: !_saving,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _isFood,
-                onChanged: _saving
-                    ? null
-                    : (value) => setState(() => _isFood = value),
-                activeThumbColor: AppColors.primary,
-                title: const Text('This is a food product'),
-                subtitle: const Text('Adds optional nutrition information'),
-              ),
-              if (_isFood) ..._nutritionFields(),
-              if (_error != null) ...[
+                _photoSection(),
+                const FarmerSection('02  Listing details'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _name,
+                  decoration: const InputDecoration(labelText: 'Product name'),
+                  validator: (v) => _required(v, 'Product name'),
+                  enabled: !_saving,
+                ),
                 const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: AppColors.error)),
-              ],
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _saving ? null : _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  minimumSize: const Size.fromHeight(48),
+                TextFormField(
+                  controller: _description,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  maxLines: 3,
+                  enabled: !_saving,
                 ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                const SizedBox(height: 12),
+                _categoryDropdown(),
+                const SizedBox(height: 12),
+                const FarmerSection('03  Price & availability'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _price,
+                        decoration: const InputDecoration(
+                          labelText: 'Price (Rs.)',
                         ),
-                      )
-                    : Text(_isEdit ? 'Save changes' : 'Submit for review'),
-              ),
-            ],
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: _validatePrice,
+                        enabled: !_saving,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: _unit,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: _units
+                            .map(
+                              (unit) => DropdownMenuItem(
+                                value: unit,
+                                child: Text(unit),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _saving
+                            ? null
+                            : (value) => setState(() => _unit = value!),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _stockQuantity,
+                        decoration: const InputDecoration(
+                          labelText: 'Stock quantity',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: _validateStock,
+                        enabled: !_saving,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _weightKg,
+                        decoration: const InputDecoration(
+                          labelText: 'Weight (kg, optional)',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: _validateWeight,
+                        enabled: !_saving,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _isFood,
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _isFood = value),
+                  activeThumbColor: AppColors.primary,
+                  title: const Text('This is a food product'),
+                  subtitle: const Text('Adds optional nutrition information'),
+                ),
+                if (_isFood) ..._nutritionFields(),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_error!, style: const TextStyle(color: AppColors.error)),
+                ],
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _saving ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(_isEdit ? 'Save changes' : 'Submit for review'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -501,6 +517,7 @@ class _FarmerProductFormScreenState extends State<FarmerProductFormScreen> {
         final categories = snapshot.data ?? [];
 
         return DropdownButtonFormField<int>(
+          isExpanded: true,
           initialValue: categories.any((c) => c.id == _categoryId)
               ? _categoryId
               : null,

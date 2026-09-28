@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/smart_basket_service.dart';
+import 'basket_ui.dart';
 
 class SmartBasketProductPicker extends StatefulWidget {
   final String workflowId;
@@ -81,21 +82,54 @@ class _SmartBasketProductPickerState extends State<SmartBasketProductPicker> {
       return (product['productName'] as String).toLowerCase().contains(query);
     }).toList();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Add a product')),
+    return BasketScaffold(
+      title: 'Add a product',
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Remaining budget: Rs. '
-              '${(widget.remainingMinor / 100).toStringAsFixed(2)}',
+            GlassCatalogCard(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: colors.primaryContainer,
+                    foregroundColor: colors.onPrimaryContainer,
+                    child: const Icon(Icons.account_balance_wallet_outlined),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'LEFT TO SPEND',
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontSize: 11,
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Rs. ${(widget.remainingMinor / 100).toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             const Text(
-              'Choose from products checked for this basket. '
-              'One selling unit will be added.',
+              'Find something fresh to add. Each pick adds one selling unit.',
             ),
             const SizedBox(height: 16),
             TextField(
@@ -136,27 +170,40 @@ class _SmartBasketProductPickerState extends State<SmartBasketProductPicker> {
                         final priceMinor = (price * 100).round();
                         final affordable = priceMinor <= widget.remainingMinor;
 
-                        return Card(
-                          child: ListTile(
-                            title: Text(product['productName'] as String),
-                            subtitle: Text(
-                              'Rs. ${price.toStringAsFixed(2)}'
-                              ' / ${product['unit']}\n'
-                              '${affordable ? 'Available: ${product['stockQuantity']}' : 'Not enough remaining budget'}',
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: GlassCatalogCard(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 6,
+                              horizontal: 4,
                             ),
-                            isThreeLine: true,
-                            trailing: IconButton(
-                              tooltip: affordable
-                                  ? 'Add product'
-                                  : 'Reduce your basket total first',
-                              onPressed: affordable
+                            radius: 20,
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: colors.primaryContainer,
+                                foregroundColor: colors.onPrimaryContainer,
+                                child: const Icon(Icons.eco_outlined),
+                              ),
+                              title: Text(product['productName'] as String),
+                              subtitle: Text(
+                                'Rs. ${price.toStringAsFixed(2)}'
+                                ' / ${product['unit']}\n'
+                                '${affordable ? 'Available: ${product['stockQuantity']}' : 'Not enough remaining budget'}',
+                              ),
+                              isThreeLine: true,
+                              trailing: IconButton(
+                                tooltip: affordable
+                                    ? 'Add product'
+                                    : 'Reduce your basket total first',
+                                onPressed: affordable
+                                    ? () => Navigator.of(context).pop(product)
+                                    : null,
+                                icon: const Icon(Icons.add_circle_outline),
+                              ),
+                              onTap: affordable
                                   ? () => Navigator.of(context).pop(product)
                                   : null,
-                              icon: const Icon(Icons.add_circle_outline),
                             ),
-                            onTap: affordable
-                                ? () => Navigator.of(context).pop(product)
-                                : null,
                           ),
                         );
                       },

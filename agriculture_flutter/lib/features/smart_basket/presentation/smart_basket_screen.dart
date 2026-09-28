@@ -6,6 +6,7 @@ import '../../orders/presentation/purchase_order_screen.dart';
 import '../data/smart_basket_service.dart';
 import '../data/smart_basket_delete_service.dart';
 import 'smart_basket_product_picker.dart';
+import 'basket_ui.dart';
 
 String basketStatus(String status) => switch (status) {
   'Pending' => 'Waiting to start',
@@ -231,122 +232,137 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
     final locked = _creating || _pendingCreate != null;
     final colors = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Smart Basket'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh history',
-            onPressed: _loading || _creating ? null : () => _load(_page),
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
+    return BasketScaffold(
+      title: 'Smart Basket',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh history',
+          onPressed: _loading || _creating ? null : () => _load(_page),
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            'Build a basket within your budget',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Choose all food categories or a single category, '
-            'then describe what you want. '
-            'You can review the basket before requesting admin approval.',
+          const BasketHero(
+            eyebrow: 'A LITTLE HELP WITH YOUR HARVEST',
+            title: 'Fresh picks.\nYour budget.',
+            description:
+                'Tell us what you love. We will prepare a basket for you to review before requesting approval.',
+            icon: Icons.auto_awesome_outlined,
           ),
           const SizedBox(height: 20),
           if (_loading) const LinearProgressIndicator(),
-          Form(
-            key: _form,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _budget,
-                  enabled: !locked,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Maximum budget (LKR)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    final text = value?.trim() ?? '';
-                    final amount = double.tryParse(text);
-
-                    if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(text) ||
-                        amount == null ||
-                        amount < 1 ||
-                        amount > 1000000) {
-                      return 'Enter 1–1,000,000, with up to 2 decimals.';
-                    }
-
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<int>(
-                  key: ValueKey(_categoryId),
-                  initialValue: _categoryId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Food category',
-                    helperText: 'Choose all food categories or one category.',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<int>(
-                      value: 0,
-                      child: Text('All food categories'),
+          GlassCatalogCard(
+            child: Form(
+              key: _form,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Make it yours',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
-                    for (final category in _categories)
-                      DropdownMenuItem<int>(
-                        value: (category['id'] as num).toInt(),
-                        child: Text(
-                          category['name'] as String,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Set your budget and choose your favourites.',
+                    style: TextStyle(color: colors.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _budget,
+                    enabled: !locked,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Maximum budget (LKR)',
+                      prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      final text = value?.trim() ?? '';
+                      final amount = double.tryParse(text);
+
+                      if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(text) ||
+                          amount == null ||
+                          amount < 1 ||
+                          amount > 1000000) {
+                        return 'Enter 1–1,000,000, with up to 2 decimals.';
+                      }
+
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey(_categoryId),
+                    initialValue: _categoryId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Food category',
+                      prefixIcon: Icon(Icons.eco_outlined),
+                      helperText: 'Choose all food categories or one category.',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: 0,
+                        child: Text('All food categories'),
                       ),
-                  ],
-                  onChanged: locked || _loading
-                      ? null
-                      : (value) {
-                          if (value == null) return;
-                          setState(() => _categoryId = value);
-                        },
-                  validator: (value) =>
-                      value == null ? 'Select a category.' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _objective,
-                  enabled: !locked,
-                  maxLength: 1000,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'What would you like?',
-                    hintText: 'A mixed food basket. Do not include pumpkin.',
-                    border: OutlineInputBorder(),
+                      for (final category in _categories)
+                        DropdownMenuItem<int>(
+                          value: (category['id'] as num).toInt(),
+                          child: Text(
+                            category['name'] as String,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: locked || _loading
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() => _categoryId = value);
+                          },
+                    validator: (value) =>
+                        value == null ? 'Select a category.' : null,
                   ),
-                  validator: (value) => (value?.trim().length ?? 0) < 5
-                      ? 'Describe your request using at least 5 characters.'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _loading || _creating ? null : _create,
-                  icon: const Icon(Icons.auto_awesome_outlined),
-                  label: Text(
-                    _creating
-                        ? 'Sending…'
-                        : _pendingCreate != null
-                        ? 'Retry same request'
-                        : 'Create basket',
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _objective,
+                    enabled: !locked,
+                    maxLength: 1000,
+                    minLines: 3,
+                    maxLines: 5,
+                    decoration: const InputDecoration(
+                      labelText: 'What would you like?',
+                      hintText: 'A mixed food basket. Do not include pumpkin.',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) => (value?.trim().length ?? 0) < 5
+                        ? 'Describe your request using at least 5 characters.'
+                        : null,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(54),
+                    ),
+                    onPressed: _loading || _creating ? null : _create,
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: Text(
+                      _creating
+                          ? 'Sending…'
+                          : _pendingCreate != null
+                          ? 'Retry same request'
+                          : 'Create basket',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           if (_pendingCreate != null)
@@ -362,56 +378,113 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(_error!, style: TextStyle(color: colors.error)),
             ),
-          const Divider(height: 36),
-          Text('Your requests', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Your baskets',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Text(
+                '$_total requests',
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           if (!_loading && _requests.isEmpty)
-            const Text('No requests on this page. Create your first basket.'),
+            const BasketHero(
+              eyebrow: 'YOUR NEXT FRESH START',
+              title: 'Your first basket awaits',
+              description:
+                  'Create a request above. You can follow its progress and review your picks here.',
+            ),
           for (final basket in _requests)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.shopping_basket_outlined),
-                title: Text(
-                  basket['objective'] as String,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  '${basketStatus(basket['status'] as String)}\n'
-                  'Budget: ${basketMoney(basket['budget'] as num)}',
-                ),
-                isThreeLine: true,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: basket['canDelete'] == true
-                          ? 'Delete basket'
-                          : 'Only finished baskets without orders can be deleted',
-                      onPressed:
-                          _loading ||
-                              _creating ||
-                              _pendingCreate != null ||
-                              basket['canDelete'] != true
-                          ? null
-                          : () => _deleteBasket(basket),
-                      icon: Icon(
-                        Icons.delete_outline,
-                        color:
-                            basket['canDelete'] == true &&
-                                !_loading &&
-                                !_creating &&
-                                _pendingCreate == null
-                            ? colors.error
-                            : null,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GlassCatalogCard(
+                padding: EdgeInsets.zero,
+                radius: 22,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _loading || _creating
+                        ? null
+                        : () => _open(basket['id'] as String),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: colors.primaryContainer,
+                                foregroundColor: colors.onPrimaryContainer,
+                                child: const Icon(
+                                  Icons.shopping_basket_outlined,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  basket['objective'] as String,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.arrow_forward_rounded, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          BasketBadge(
+                            status: basket['status'] as String,
+                            label: basketStatus(basket['status'] as String),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  basketMoney(basket['budget'] as num),
+                                  style: TextStyle(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                              if (basket['canDelete'] == true)
+                                IconButton(
+                                  tooltip: 'Delete basket',
+                                  onPressed:
+                                      _loading ||
+                                          _creating ||
+                                          _pendingCreate != null
+                                      ? null
+                                      : () => _deleteBasket(basket),
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: colors.error,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right),
-                  ],
+                  ),
                 ),
-                onTap: _loading || _creating
-                    ? null
-                    : () => _open(basket['id'] as String),
               ),
             ),
           Row(
@@ -643,8 +716,8 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
 
     return PopScope(
       canPop: !_busy,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Your basket')),
+      child: BasketScaffold(
+        title: 'Your basket',
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -665,15 +738,44 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
             ),
             if (basket != null) ...[
               const SizedBox(height: 16),
-              Text(
-                basketStatus(status!),
-                style: Theme.of(context).textTheme.titleLarge,
+              BasketHero(
+                eyebrow: 'YOUR PERSONAL BASKET',
+                title: basketStatus(status!),
+                description: basket['objective'] as String,
+                icon: status == 'Failed' || status == 'Rejected'
+                    ? Icons.info_outline
+                    : Icons.shopping_basket_outlined,
               ),
-              const SizedBox(height: 10),
-              Text(basket['objective'] as String),
-              const SizedBox(height: 8),
-              Text('Budget: ${basketMoney(basket['budget'] as num)}'),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              GlassCatalogCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'YOUR BUDGET',
+                      style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      basketMoney(basket['budget'] as num),
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: colors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    BasketBadge(status: status, label: basketStatus(status)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               if (const {'Pending', 'Planning', 'Validating'}.contains(status))
                 const Text(
                   'Your basket is being prepared. '
@@ -704,63 +806,67 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                 const SizedBox(height: 12),
               ],
               for (final line in _lines)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          line['productName'] as String,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          '${basketMoney(line['unitPrice'] as num)}'
-                          ' / ${line['unit']}',
-                        ),
-                        Row(
-                          children: [
-                            if (editable)
-                              IconButton(
-                                onPressed:
-                                    !canEdit || (line['quantity'] as num) <= 1
-                                    ? null
-                                    : () => setState(() {
-                                        line['quantity'] =
-                                            (line['quantity'] as int) - 1;
-                                        _dirty = true;
-                                      }),
-                                icon: const Icon(Icons.remove),
-                              ),
-                            Text('Quantity: ${line['quantity']}'),
-                            if (editable)
-                              IconButton(
-                                onPressed:
-                                    !canEdit ||
-                                        (line['quantity'] as num) >= 100000
-                                    ? null
-                                    : () => setState(() {
-                                        line['quantity'] =
-                                            (line['quantity'] as int) + 1;
-                                        _dirty = true;
-                                      }),
-                                icon: const Icon(Icons.add),
-                              ),
-                            const Spacer(),
-                            if (editable)
-                              IconButton(
-                                tooltip: 'Remove product',
-                                onPressed: !canEdit
-                                    ? null
-                                    : () => setState(() {
-                                        _lines.remove(line);
-                                        _dirty = true;
-                                      }),
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                          ],
-                        ),
-                      ],
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GlassCatalogCard(
+                    padding: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            line['productName'] as String,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            '${basketMoney(line['unitPrice'] as num)}'
+                            ' / ${line['unit']}',
+                          ),
+                          Row(
+                            children: [
+                              if (editable)
+                                IconButton(
+                                  onPressed:
+                                      !canEdit || (line['quantity'] as num) <= 1
+                                      ? null
+                                      : () => setState(() {
+                                          line['quantity'] =
+                                              (line['quantity'] as int) - 1;
+                                          _dirty = true;
+                                        }),
+                                  icon: const Icon(Icons.remove),
+                                ),
+                              Text('Quantity: ${line['quantity']}'),
+                              if (editable)
+                                IconButton(
+                                  onPressed:
+                                      !canEdit ||
+                                          (line['quantity'] as num) >= 100000
+                                      ? null
+                                      : () => setState(() {
+                                          line['quantity'] =
+                                              (line['quantity'] as int) + 1;
+                                          _dirty = true;
+                                        }),
+                                  icon: const Icon(Icons.add),
+                                ),
+                              const Spacer(),
+                              if (editable)
+                                IconButton(
+                                  tooltip: 'Remove product',
+                                  onPressed: !canEdit
+                                      ? null
+                                      : () => setState(() {
+                                          _lines.remove(line);
+                                          _dirty = true;
+                                        }),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

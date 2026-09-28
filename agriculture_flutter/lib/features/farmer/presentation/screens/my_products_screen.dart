@@ -1,240 +1,315 @@
 import 'package:flutter/material.dart';
-
 import '../../../../core/constants/app_colors.dart';
 import '../../../../shared/widgets/catalog_common.dart';
 import '../../data/models/farmer_product_models.dart';
 import '../../data/services/farmer_product_service.dart';
+import '../widgets/farmer_ui.dart';
 import 'farmer_product_form_screen.dart';
 
 class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({super.key});
-
   @override
   State<MyProductsScreen> createState() => _MyProductsScreenState();
 }
 
 class _MyProductsScreenState extends State<MyProductsScreen> {
-  late Future<FarmerProductPage> _future;
-
-  int _page = 1;
-  static const _pageSize = 20;
+  late Future<List<FarmerProduct>> _future = FarmerProductService.instance
+      .listAll();
+  final _search = TextEditingController();
+  String _status = 'ALL';
 
   @override
-  void initState() {
-    super.initState();
-    _future = _fetch();
-  }
-
-  Future<FarmerProductPage> _fetch() {
-    return FarmerProductService.instance.list(page: _page, pageSize: _pageSize);
-  }
-
-  void _load({int page = 1}) {
-    if (!mounted) return;
-
-    setState(() {
-      _page = page;
-      _future = _fetch();
-    });
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
-    _load(page: _page);
-
+    setState(() => _future = FarmerProductService.instance.listAll());
     try {
       await _future;
     } catch (_) {
-      // FutureBuilder shows the error state.
+      /* Displayed in the list. */
     }
   }
 
   Future<void> _openForm({FarmerProduct? product}) async {
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+      MaterialPageRoute(
         builder: (_) => FarmerProductFormScreen(product: product),
       ),
     );
-
-    if (saved == true) {
-      _load(page: 1);
-    }
+    if (saved == true && mounted) await _refresh();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => FarmerPage(
+    child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('My Products'),
         backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(),
-        backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add),
         label: const Text('Add product'),
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          color: AppColors.primary,
-          child: FutureBuilder<FarmerProductPage>(
-            future: _future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (snapshot.hasError) {
-                return _MessageView(
-                  error: snapshot.error,
-                  onRetry: () => _load(page: _page),
-                );
-              }
-
-              final data = snapshot.data!;
-
-              if (data.items.isEmpty) {
-                return _MessageView(
-                  message: 'You have not added any products yet.',
-                  onRetry: () => _openForm(),
-                  retryLabel: 'Add your first product',
-                );
-              }
-
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                children: [
-                  ...data.items.map(
-                    (product) => _ProductTile(
-                      product: product,
-                      onTap: () => _openForm(product: product),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<List<FarmerProduct>>(
+          future: _future,
+          builder: (context, snapshot) {
+            final all = snapshot.data ?? <FarmerProduct>[];
+            final query = _search.text.trim().toLowerCase();
+            final filtered = all
+                .where(
+                  (p) =>
+                      (_status == 'ALL' || p.status == _status) &&
+                      '${p.name} ${p.categoryName}'.toLowerCase().contains(
+                        query,
+                      ),
+                )
+                .toList();
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 104),
+              children: [
+                const FarmerHero(
+                  eyebrow: 'From farm to market',
+                  title: 'Make your harvest stand out.',
+                  subtitle:
+                      'Manage your listings, keep stock up to date and follow each review.',
+                  icon: Icons.inventory_2_outlined,
+                ),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snapshot.hasError)
+                  FarmerEmpty(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Could not load products',
+                    message: snapshot.error is FarmerProductException
+                        ? (snapshot.error as FarmerProductException).message
+                        : 'Please try again.',
+                    onAction: _refresh,
+                  )
+                else ...[
+                  const SizedBox(height: 16),
+                  FarmerMetrics(
+                    children: [
+                      FarmerMetric(
+                        value: '${all.length}',
+                        label: 'Total products',
+                        icon: Icons.inventory_2_outlined,
+                      ),
+                      FarmerMetric(
+                        value: '${all.where((p) => p.isApproved).length}',
+                        label: 'Approved',
+                        icon: Icons.check_circle_outline,
+                      ),
+                      FarmerMetric(
+                        value: '${all.where((p) => p.isPending).length}',
+                        label: 'Awaiting review',
+                        icon: Icons.schedule,
+                      ),
+                    ],
+                  ),
+                  const FarmerSection('Your listings'),
+                  TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search products or categories',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: query.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              icon: const Icon(Icons.close),
+                              onPressed: () => setState(_search.clear),
+                            ),
                     ),
                   ),
-                  if (data.totalPages > 1)
-                    _Pagination(
-                      page: data.page,
-                      totalPages: data.totalPages,
-                      onPrevious: data.page > 1
-                          ? () => _load(page: data.page - 1)
-                          : null,
-                      onNext: data.page < data.totalPages
-                          ? () => _load(page: data.page + 1)
-                          : null,
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final entry in const {
+                        'ALL': 'All',
+                        'APPROVED': 'Approved',
+                        'PENDING': 'Pending',
+                        'REJECTED': 'Rejected',
+                      }.entries)
+                        ChoiceChip(
+                          label: Text(entry.value),
+                          selected: _status == entry.key,
+                          onSelected: (_) =>
+                              setState(() => _status = entry.key),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (all.isEmpty)
+                    FarmerEmpty(
+                      icon: Icons.eco_outlined,
+                      title: 'Your next harvest starts here',
+                      message:
+                          'Add a product with photos, a price and available stock.',
+                      actionLabel: 'Add your first product',
+                      onAction: () => _openForm(),
+                    )
+                  else if (filtered.isEmpty)
+                    FarmerEmpty(
+                      icon: Icons.search_off,
+                      title: 'No matching products',
+                      message: 'Try another name or review status.',
+                      actionLabel: 'Clear filters',
+                      onAction: () => setState(() {
+                        _search.clear();
+                        _status = 'ALL';
+                      }),
+                    )
+                  else
+                    ...filtered.map(
+                      (p) => _ProductTile(
+                        product: p,
+                        onTap: () => _openForm(product: p),
+                      ),
                     ),
                 ],
-              );
-            },
-          ),
+              ],
+            );
+          },
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _ProductTile extends StatelessWidget {
   final FarmerProduct product;
   final VoidCallback onTap;
-
   const _ProductTile({required this.product, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: CatalogImage(product.thumbnail),
+  Widget build(BuildContext context) => Card(
+    color: Colors.white,
+    elevation: 0,
+    margin: const EdgeInsets.only(bottom: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+      side: const BorderSide(color: AppColors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 88,
+                    height: 96,
+                    child: CatalogImage(product.thumbnail),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            product.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        _StatusChip(status: product.status),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.categoryName,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Text(
-                          product.formattedPrice,
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Stock: ${product.stockQuantity}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (product.isRejected &&
-                        (product.rejectionReason ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Admin note: ${product.rejectionReason}',
+                        product.categoryName,
                         style: const TextStyle(
-                          color: AppColors.error,
                           fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        product.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        product.formattedPrice,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
-                  ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _StatusChip(status: product.status),
+                Text(
+                  product.stockQuantity == 0
+                      ? 'Out of stock'
+                      : '${product.stockQuantity} in stock',
+                  style: TextStyle(
+                    color: product.stockQuantity == 0
+                        ? AppColors.error
+                        : AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            if (product.isRejected &&
+                (product.rejectionReason ?? '').isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Review note: ${product.rejectionReason}',
+                  style: const TextStyle(color: AppColors.error, height: 1.4),
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onTap,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: Text(
+                  product.isRejected ? 'Edit & resubmit' : 'Edit product',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _StatusChip extends StatelessWidget {
@@ -264,95 +339,6 @@ class _StatusChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
-    );
-  }
-}
-
-class _Pagination extends StatelessWidget {
-  final int page;
-  final int totalPages;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-
-  const _Pagination({
-    required this.page,
-    required this.totalPages,
-    this.onPrevious,
-    this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          Text(
-            'Page $page of $totalPages',
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-          IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageView extends StatelessWidget {
-  final Object? error;
-  final String message;
-  final VoidCallback? onRetry;
-  final String retryLabel;
-
-  const _MessageView({
-    this.error,
-    this.message = 'Something went wrong. Please try again.',
-    this.onRetry,
-    this.retryLabel = 'Try again',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final problem = error;
-    final needsLogin =
-        problem is FarmerProductException && problem.needsLogin;
-
-    final displayMessage = problem is FarmerProductException
-        ? problem.message
-        : problem != null
-        ? 'Something went wrong. Please try again.'
-        : message;
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
-      children: [
-        Icon(
-          problem == null ? Icons.inventory_2_outlined : Icons.cloud_off_outlined,
-          color: AppColors.primary,
-          size: 42,
-        ),
-        const SizedBox(height: 14),
-        Text(
-          displayMessage,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        if (!needsLogin && onRetry != null) ...[
-          const SizedBox(height: 16),
-          Center(
-            child: FilledButton(
-              onPressed: onRetry,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-              child: Text(retryLabel),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

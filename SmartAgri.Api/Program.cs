@@ -25,6 +25,7 @@ builder.Services.AddSingleton<ProductImageStore>();
 builder.Services.AddSingleton<CategoryImageStore>();
 builder.Services.AddSingleton<ProfileImageStore>();
 builder.Services.AddScoped<IFarmService, FarmService>();
+builder.Services.AddScoped<IPackageService, PackageService>();
 builder.Services.AddSingleton<FarmImageStore>();
 
 // 2. Swagger Configuration with JWT Authorize Button

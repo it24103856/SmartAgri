@@ -7,6 +7,7 @@ import CategoryManagement from './pages/Categories/CategoryManagement';
 import ProductManagement from './pages/Products/ProductManagement';
 import OrderManagement from './pages/Orders/OrderManagement';
 import SmartBasketManagement from './pages/SmartBaskets/SmartBasketManagement';
+import PackageManagement from './pages/Packages/PackageManagement';
 
 
 function App() {
@@ -40,7 +41,7 @@ function App() {
         {activeTab === 'products' && <ProductManagement />}
         {activeTab === 'orders' && <OrderManagement />}
         {activeTab === 'ai-manage' && <SmartBasketManagement />}
-        
+        {activeTab === 'equipment' && <PackageManagement />}
 
         {![
           'dashboard',
@@ -49,6 +50,7 @@ function App() {
           'products',
           'orders',
           'ai-manage',
+          'equipment',
         ].includes(activeTab) && (
           <div className="p-4">
             <h1 className="text-2xl font-bold text-[#1E3A2B] capitalize">{activeTab} Section</h1>

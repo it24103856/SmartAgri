@@ -17,6 +17,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Cart> Carts { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
     public DbSet<Farm> Farms => Set<Farm>();
+    public DbSet<Package> Packages => Set<Package>();
+    public DbSet<PackageBooking> PackageBookings => Set<PackageBooking>();
 
    public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
 
@@ -407,6 +409,77 @@ modelBuilder.Entity<CartItem>(entity =>
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(f => f.FarmerId);
+        });
+
+        modelBuilder.Entity<Package>(entity =>
+        {
+            entity.ToTable("Packages");
+            entity.HasKey(p => p.Id);
+
+            entity.Property(p => p.Name)
+                .IsRequired()
+                .HasMaxLength(150);
+
+            entity.Property(p => p.Description)
+                .IsRequired()
+                .HasMaxLength(2000);
+
+            entity.Property(p => p.Category)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entity.Property(p => p.BaseRate).HasPrecision(12, 2);
+            entity.Property(p => p.MinimumCharge).HasPrecision(12, 2);
+            entity.Property(p => p.QuantityPerAcreKg).HasPrecision(12, 2);
+            entity.Property(p => p.MaxLoadKg).HasPrecision(12, 2);
+            entity.Property(p => p.RatePerExtraKg).HasPrecision(12, 2);
+
+            entity.Property(p => p.CropType).HasMaxLength(100);
+
+            entity.Property(p => p.Version).IsConcurrencyToken();
+
+            entity.HasOne(p => p.CreatedBy)
+                .WithMany()
+                .HasForeignKey(p => p.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(p => p.Category);
+            entity.HasIndex(p => p.IsActive);
+        });
+
+        modelBuilder.Entity<PackageBooking>(entity =>
+        {
+            entity.ToTable("PackageBookings");
+            entity.HasKey(b => b.Id);
+
+            entity.Property(b => b.LandSizeAcres).HasPrecision(12, 2);
+            entity.Property(b => b.DistanceKm).HasPrecision(12, 2);
+            entity.Property(b => b.LoadWeightKg).HasPrecision(12, 2);
+            entity.Property(b => b.CalculatedQuantity).HasPrecision(12, 2);
+            entity.Property(b => b.TotalPrice).HasPrecision(12, 2);
+
+            entity.Property(b => b.Status)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("PENDING");
+
+            entity.Property(b => b.Notes).HasMaxLength(500);
+            entity.Property(b => b.AdminNote).HasMaxLength(500);
+
+            entity.Property(b => b.Version).IsConcurrencyToken();
+
+            entity.HasOne(b => b.Package)
+                .WithMany()
+                .HasForeignKey(b => b.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(b => b.Farmer)
+                .WithMany()
+                .HasForeignKey(b => b.FarmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(b => b.Status);
+            entity.HasIndex(b => b.FarmerId);
         });
     }
 }

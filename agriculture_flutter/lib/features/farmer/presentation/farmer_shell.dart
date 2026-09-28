@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import 'screens/farmer_dashboard_screen.dart';
 import 'screens/my_farms_screen.dart';
 import 'screens/my_products_screen.dart';
+import 'screens/packages_screen.dart';
 import 'screens/farmer_profile_screen.dart';
 
 class FarmerShell extends StatefulWidget {
@@ -18,12 +19,16 @@ class FarmerShell extends StatefulWidget {
 class _FarmerShellState extends State<FarmerShell> {
   int _selectedIndex = 0;
 
-  late final List<Widget> _pages = [
-    FarmerDashboardScreen(fullName: widget.fullName, onOpenTab: _selectTab),
-    const MyFarmsScreen(),
-    const MyProductsScreen(),
-    FarmerProfileScreen(fullName: widget.fullName),
-  ];
+  Widget _page() => switch (_selectedIndex) {
+    0 => FarmerDashboardScreen(
+      fullName: widget.fullName,
+      onOpenTab: _selectTab,
+    ),
+    1 => const MyFarmsScreen(),
+    2 => const PackagesScreen(),
+    3 => const MyProductsScreen(),
+    _ => FarmerProfileScreen(fullName: widget.fullName),
+  };
 
   void _selectTab(int index) {
     if (!mounted || index == _selectedIndex) return;
@@ -43,32 +48,31 @@ class _FarmerShellState extends State<FarmerShell> {
         }
       },
       child: Scaffold(
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: List.generate(
-            _pages.length,
-            (index) => TickerMode(
-              enabled: index == _selectedIndex,
-              child: _pages[index],
-            ),
-          ),
-        ),
+        body: _page(),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _selectedIndex,
           onDestinationSelected: _selectTab,
           backgroundColor: AppColors.surface,
           indicatorColor: AppColors.soft,
-          height: 64,
+          height: 76,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),
               selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
-              label: 'Dashboard',
+              label: 'Home',
             ),
             NavigationDestination(
               icon: Icon(Icons.landscape_outlined),
               selectedIcon: Icon(Icons.landscape, color: AppColors.primary),
               label: 'My Farms',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.local_shipping_outlined),
+              selectedIcon: Icon(
+                Icons.local_shipping,
+                color: AppColors.primary,
+              ),
+              label: 'Packages',
             ),
             NavigationDestination(
               icon: Icon(Icons.inventory_2_outlined),

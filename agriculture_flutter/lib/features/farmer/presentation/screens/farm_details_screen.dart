@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/farmer_ui.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -37,6 +38,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
         if (mounted) {
           setState(() {
             _farm = fresh;
+            _activeImageIndex = 0;
           });
         }
       } catch (_) {}
@@ -86,180 +88,184 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(_farm.name),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit Farm',
-            onPressed: _deleting ? null : _editFarm,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppColors.error),
-            tooltip: 'Delete Farm',
-            onPressed: _deleting ? null : _deleteFarm,
-          ),
-        ],
-      ),
-      body: _deleting
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _imageCarousel(),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _farm.name,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _farm.isActive
-                                    ? AppColors.primary.withValues(alpha: 0.12)
-                                    : Colors.grey.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                _farm.status,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: _farm.isActive
-                                      ? AppColors.primary
-                                      : Colors.grey[700],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_farm.location != null &&
-                            _farm.location!.isNotEmpty) ...[
-                          const SizedBox(height: 6),
+    return FarmerPage(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(_farm.name),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Farm',
+              onPressed: _deleting ? null : _editFarm,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: 'Delete Farm',
+              onPressed: _deleting ? null : _deleteFarm,
+            ),
+          ],
+        ),
+        body: _deleting
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _imageCarousel(),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 16,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  _farm.location!,
+                                  _farm.name,
                                   style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _farm.isActive
+                                      ? AppColors.primary.withValues(
+                                          alpha: 0.12,
+                                        )
+                                      : Colors.grey.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  _farm.status,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _farm.isActive
+                                        ? AppColors.primary
+                                        : Colors.grey[700],
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Farm Specifications',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _specsGrid(),
-                        if (_farm.mainCrops != null &&
-                            _farm.mainCrops!.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          const Text(
-                            'Main Crops',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _farm.mainCrops!
-                                .split(RegExp(r'[,،]+'))
-                                .map((crop) => crop.trim())
-                                .where((crop) => crop.isNotEmpty)
-                                .map(
-                                  (crop) => Chip(
-                                    avatar: const Icon(
-                                      Icons.eco,
-                                      size: 16,
-                                      color: AppColors.primary,
+                          if (_farm.location != null &&
+                              _farm.location!.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    _farm.location!,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
                                     ),
-                                    label: Text(crop),
-                                    backgroundColor: AppColors.soft,
-                                    side: BorderSide.none,
                                   ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                        if (_farm.description != null &&
-                            _farm.description!.isNotEmpty) ...[
+                                ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 20),
                           const Text(
-                            'About this Farm',
+                            'Land, soil & water',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Text(
-                              _farm.description!,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.5,
+                          const SizedBox(height: 12),
+                          _specsGrid(),
+                          if (_farm.mainCrops != null &&
+                              _farm.mainCrops!.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Main Crops',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _farm.mainCrops!
+                                  .split(RegExp(r'[,،]+'))
+                                  .map((crop) => crop.trim())
+                                  .where((crop) => crop.isNotEmpty)
+                                  .map(
+                                    (crop) => Chip(
+                                      avatar: const Icon(
+                                        Icons.eco,
+                                        size: 16,
+                                        color: AppColors.primary,
+                                      ),
+                                      label: Text(crop),
+                                      backgroundColor: AppColors.soft,
+                                      side: BorderSide.none,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                          if (_farm.description != null &&
+                              _farm.description!.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            const Text(
+                              'About this Farm',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Text(
+                                _farm.description!,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
@@ -344,13 +350,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
   }
 
   Widget _specsGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 2.2,
+    return Column(
       children: [
         _specCard(
           icon: Icons.square_foot,
@@ -383,7 +383,8 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
@@ -408,7 +409,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -418,7 +419,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
