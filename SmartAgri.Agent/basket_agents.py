@@ -2,14 +2,17 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
+import unicodedata
 from datetime import datetime, timezone
 from uuid import UUID
+from typing import Literal
 
 import httpx
 from google import genai
 from google.genai import types
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, PrivateAttr, ValidationError, model_validator
 
 from basket_tools import validate_basket
 from schemas import (
@@ -21,15 +24,15 @@ from schemas import (
 
 
 logger = logging.getLogger("uvicorn.error")
-
+MODEL_NAME = "gemini-3.5-flash-lite"
 
 class ProposalRequest(StrictModel):
     workflow_id: UUID
-    objective: str = Field(min_length=5, max_length=1000)
-    budget_minor: int = Field(strict=True, gt=0, le=100_000_000)
+    objective: str = Field(min_length=1, max_length=1000)
+    budget_minor: int | None = Field(default=None, strict=True, gt=0, le=100_000_000)
     currency: str = Field(default="LKR", pattern="^LKR$")
     products: list[CatalogProduct] = Field(
-        min_length=1,
+        min_length=0,
         max_length=50,
     )
     excluded_product_ids: list[int] = Field(
@@ -53,7 +56,11 @@ class ProposalRequest(StrictModel):
         return self
 
 
-class BasketPlan(StrictModel):
+class AgentOutput(StrictModel):
+    _used_fallback: bool = PrivateAttr(default=False)
+
+
+class BasketPlan(AgentOutput):
     goal: str = Field(min_length=1, max_length=500)
     excluded_foods: list[str] = Field(max_length=20)
     selection_rules: list[str] = Field(max_length=10)
@@ -63,14 +70,21 @@ class RequiredItem(BasketLine):
     exact_quantity: bool = Field(strict=True)
 
 
-class CatalogSelection(StrictModel):
+class UnavailableItem(StrictModel):
+    requested_name: str = Field(min_length=1, max_length=150)
+    reason: Literal["not_available", "insufficient_stock"]
+
+
+class CatalogSelection(AgentOutput):
     eligible_product_ids: list[int] = Field(max_length=50)
     excluded_product_ids: list[int] = Field(max_length=50)
 
     required_items: list[RequiredItem] = Field(max_length=50)
+    unavailable_items: list[UnavailableItem] = Field(default_factory=list, max_length=50)
 
     cover_all_categories: bool = Field(strict=True)
     fill_budget: bool = Field(strict=True)
+    fixed_list: bool = Field(default=False, strict=True)
 
     issues: list[str] = Field(max_length=10)
 
@@ -82,13 +96,167 @@ class BasketDraft(StrictModel):
     )
 
 
-class BasketReview(StrictModel):
+class BasketReview(AgentOutput):
     accepted: bool = Field(strict=True)
     issues: list[str] = Field(max_length=10)
 
 
 class ProposalRejected(Exception):
     pass
+
+
+FALLBACK_LIST_REQUIRED = "Local fallback needs a simple shopping list."
+
+# Name aliases only: IDs, prices, stock and selling units always come from
+# the supplied catalog. Do not use fuzzy matching to guess another product.
+_LOCAL_ALIASES = {
+    "almond": "almond", "almonds": "almond", "amand": "almond",
+    "cabbage": "cabbage", "cabbages": "cabbage", "gowa": "cabbage",
+    "gova": "cabbage", "ගෝවා": "cabbage",
+    "tomato": "tomato", "tomatoes": "tomato", "tomatto": "tomato",
+    "tommatos": "tomato", "tomatos": "tomato",
+    "orange": "orange", "oranges": "orange", "orrange": "orange",
+    "apple": "apple", "apples": "apple",
+}
+_LOCAL_UNITS = {
+    "kg": "kg", "kgs": "kg", "kilogram": "kg", "kilograms": "kg",
+    "g": "g", "gram": "g", "grams": "g",
+    "pack": "pack", "packs": "pack", "piece": "piece", "pieces": "piece",
+    "unit": "unit", "units": "unit",
+}
+
+
+def _local_name(value):
+    value = " ".join(unicodedata.normalize("NFKC", value).casefold().split())
+    return _LOCAL_ALIASES.get(value, value)
+
+
+def _local_list(objective):
+    """Parse only a bounded comma-separated shopping list, not free-form goals."""
+    text = objective.strip().rstrip(".!")
+    text = re.sub(r"^(?:i (?:want|need|would like)|please (?:add|give me)|buy|add|give me)\s+", "", text, flags=re.I)
+    # Never silently discard an exclusion, preference, alternative or budget.
+    if re.search(
+        r"\b(?:without|except|exclude|excluding|avoid|don't|dont|skip|remove|never|epa|nathuwa|not|no|only|all|mixed|basket|"
+        r"budget|under|within|cheapest|suggest|recommend|allergic|allergy|"
+        r"vegan|vegetarian|halal|kosher|free|or|instead|less|more|half|quarter|one|two|three|for|with)\b", text, re.I
+    ):
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+
+    # Ignore blank entries from trailing commas, repeated separators or blank
+    # lines. They are formatting noise, not extra shopping requirements.
+    parts = [part.strip() for part in re.split(
+        r"[,;\n]+|\band\b|(?<!\d)\.(?!\d)", text, flags=re.I
+    ) if part.strip()]
+    if not 1 <= len(parts) <= 50:
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+
+    result = []
+    seen = set()
+    units = "|".join(sorted(_LOCAL_UNITS, key=len, reverse=True))
+    for part in parts:
+        name = part.strip()
+        match = re.fullmatch(rf"(\d+)\s*(?:({units})\s+)?\s*(.+)", name, re.I)
+        quantity, unit, exact = 1, None, False
+        if match:
+            quantity = int(match[1])
+            unit = _LOCAL_UNITS.get((match[2] or "").casefold())
+            name = match[3].strip()
+            exact = True
+            if name.casefold() in _LOCAL_UNITS:
+                raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+        if (not 1 <= quantity <= 100000 or not 1 <= len(name) <= 150 or
+            not all(c.isalpha() or unicodedata.category(c).startswith("M") or c in " -'" for c in name)):
+            raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+        canonical = _local_name(name)
+        if canonical in seen:
+            raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+        seen.add(canonical)
+        result.append((name, canonical, quantity, unit, exact))
+    return result
+
+
+def _local_selection(payload):
+    requested = _local_list(payload["objective"])
+    products = [CatalogProduct.model_validate(p) for p in payload["catalog"]]
+    explicit_exclusions = set(payload.get("explicit_excluded_product_ids", []))
+    required, unavailable = [], []
+    for name, canonical, quantity, unit, exact in requested:
+        matches = [p for p in products if _local_name(p.name) == canonical
+                   and p.is_food and p.approved and p.stock_quantity > 0]
+        if len(matches) > 1:
+            raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+        if not matches:
+            unavailable.append(UnavailableItem(requested_name=name, reason="not_available"))
+            continue
+        product = matches[0]
+        selling_unit = _LOCAL_UNITS.get(product.unit.strip().casefold(), product.unit.strip().casefold())
+        if (product.id in explicit_exclusions or
+            (unit is not None and unit != selling_unit) or
+            (exact and unit is None and selling_unit not in {"piece", "pack", "unit"})):
+            # Never assume a pack contains a kilogram, or convert weights.
+            raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+        if quantity > product.stock_quantity:
+            unavailable.append(UnavailableItem(requested_name=name, reason="insufficient_stock"))
+            continue
+        required.append(RequiredItem(product_id=product.id, quantity=quantity, exact_quantity=exact))
+    return CatalogSelection(
+        eligible_product_ids=[item.product_id for item in required],
+        excluded_product_ids=sorted(explicit_exclusions & {p.id for p in products}),
+        required_items=required, unavailable_items=unavailable,
+        cover_all_categories=False, fill_budget=False, fixed_list=True, issues=[],
+    )
+
+
+def _local_review(payload):
+    # Recompute from the ORIGINAL objective and catalog. A provider failure
+    # never turns the previous AI output into an automatically accepted result.
+    expected = _local_selection(payload)
+    actual = CatalogSelection.model_validate(payload["selection"])
+
+    def signature(value):
+        return (
+            sorted(value.eligible_product_ids), sorted(value.excluded_product_ids),
+            sorted((i.product_id, i.quantity, i.exact_quantity) for i in value.required_items),
+            sorted((_local_name(i.requested_name), i.reason) for i in value.unavailable_items),
+            value.cover_all_categories, value.fill_budget, value.fixed_list, value.issues,
+        )
+
+    if signature(actual) != signature(expected):
+        return BasketReview(accepted=False, issues=["Selection does not match the verified shopping list."])
+
+    if "basket" in payload:
+        basket = payload["basket"]
+        checked = validate_basket(BasketValidationRequest(
+            workflow_id=basket["workflow_id"], budget_minor=payload.get("budget_minor"),
+            currency=basket["currency"], products=payload["catalog"],
+            excluded_product_ids=expected.excluded_product_ids,
+            items=[BasketLine(product_id=i.product_id, quantity=i.quantity) for i in expected.required_items],
+        ))
+        checked_data = checked.model_dump(mode="json")
+        if (not checked.valid or basket.get("valid") is not True or
+            basket.get("total_minor") != checked.total_minor or basket.get("errors") != [] or
+            sorted(basket.get("items", []), key=lambda i: i["product_id"]) !=
+            sorted(checked_data["items"], key=lambda i: i["product_id"])):
+            return BasketReview(accepted=False, issues=["Basket does not match catalog prices, quantities or budget."])
+
+    return BasketReview(accepted=True, issues=[])
+
+
+def local_fallback(payload, output_type):
+    print(f"\n⚠️  [FALLBACK TRIGGERED] Generating local fallback for {output_type.__name__}")
+    if output_type is BasketPlan:
+        _local_list(payload["objective"])
+        result = BasketPlan(goal="Prepare the customer's shopping list", excluded_foods=[],
+                            selection_rules=["Use catalog matches only; report missing items; respect the supplied budget."])
+    elif output_type is CatalogSelection:
+        result = _local_selection(payload)
+    elif output_type is BasketReview:
+        result = _local_review(payload)
+    else:
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+    result._used_fallback = True
+    return result
 
 
 def now():
@@ -99,7 +267,13 @@ def build_basket(products, budget, selection):
     catalog = {p.id: p for p in products}
     quantities = {}
     fixed = set()
-    remaining = budget
+    # Without a spending limit, allow one selling unit per eligible product
+    # plus explicitly requested quantities. Never fill stock without a budget.
+    requested_quantities = {item.product_id: item.quantity for item in selection.required_items}
+    remaining = budget if budget is not None else sum(
+        p.unit_price_minor * max(1, requested_quantities.get(p.id, 1))
+        for p in products
+    )
 
     # First satisfy explicitly requested products and quantities.
     for item in selection.required_items:
@@ -130,6 +304,9 @@ def build_basket(products, budget, selection):
 
         if item.exact_quantity:
             fixed.add(product.id)
+
+    if selection.required_items and selection.fixed_list:
+        return [BasketLine(product_id=pid, quantity=qty) for pid, qty in sorted(quantities.items())]
 
     def category(product):
         if product.category_id is not None:
@@ -195,7 +372,7 @@ def build_basket(products, budget, selection):
             remaining -= product.unit_price_minor
 
     # Fill remaining budget without exceeding stock or exact quantities.
-    if selection.fill_budget:
+    if selection.fill_budget and budget is not None:
         while True:
             candidates = [
                 p
@@ -259,63 +436,58 @@ def build_basket(products, budget, selection):
 
 async def ask_model(client, role, instruction, payload, output_type):
     if client is None:
-        raise ProposalRejected(
-            "Gemini API key is not configured."
-        )
+        logger.warning("Gemini is not configured; using local catalog fallback for %s.", role)
+        return local_fallback(payload, output_type)
 
     output_schema = output_type.model_json_schema()
 
-    # Gemini's response_schema supports an OpenAPI-style subset and rejects
-    # Pydantic's JSON Schema `additionalProperties` and extra keywords.
-    def normalize_schema(value):
+    def resolve_refs(value, defs):
         if isinstance(value, dict):
-            value.pop("additionalProperties", None)
-            value.pop("exclusiveMinimum", None)
-            value.pop("exclusiveMaximum", None)
-            for child in value.values():
-                normalize_schema(child)
+            if "$ref" in value:
+                ref_name = value["$ref"].split("/")[-1]
+                if ref_name in defs:
+                    resolved = defs[ref_name].copy()
+                    value.clear()
+                    value.update(resolved)
+                    resolve_refs(value, defs)
+            else:
+                for k, v in list(value.items()):
+                    if k in ("default", "title", "minLength", "maxLength", "additionalProperties", "minimum", "maximum", "minItems", "maxItems", "exclusiveMinimum", "exclusiveMaximum", "anyOf"):
+                        value.pop(k, None)
+                    else:
+                        resolve_refs(v, defs)
         elif isinstance(value, list):
-            for child in value:
-                normalize_schema(child)
+            for item in value:
+                resolve_refs(item, defs)
 
-    normalize_schema(output_schema)
+    _schema_defs = output_schema.pop("$defs", {})
+    resolve_refs(output_schema, _schema_defs)
 
     if output_type is CatalogSelection:
-        allowed_ids = sorted({
-            str(product["id"])  # IDs string walata convert karanawa
-            for product in payload["catalog"]
-        })
+        # We handle empty catalog validation locally if needed.
+        pass
 
-        if not allowed_ids:
-            raise ProposalRejected(
-                "No eligible food products are available."
-            )
-
-        # Restrict both ID lists to this request's catalog (as strings)
-        for field_name in (
-            "eligible_product_ids",
-            "excluded_product_ids",
-        ):
-            output_schema["properties"][field_name]["items"] = {
-                "type": "string",  # Type eka string karanawa
-                "enum": allowed_ids,
-            }
-
-        # Restrict explicitly requested product IDs too (as strings)
-        output_schema["$defs"]["RequiredItem"]["properties"][
-            "product_id"
-        ]["enum"] = allowed_ids
-
+    if output_type is CatalogSelection:
+        print("\n===== CATALOG OUTPUT SCHEMA =====")
+        print(json.dumps(output_schema, indent=2, ensure_ascii=False))
+        print("===== END CATALOG OUTPUT SCHEMA =====\n")
 
     max_retries = 3
     response = None
+    contents = payload
+    prompt_text = (
+        json.dumps(contents, ensure_ascii=False)
+        if isinstance(contents, dict)
+        else contents
+    )
 
     for attempt in range(max_retries):
         try:
+            print("DEBUG PROMPT/CONTENTS:", prompt_text)
             response = await asyncio.to_thread(
                 client.models.generate_content,
-                model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
-                contents=json.dumps(payload, ensure_ascii=False),
+                model=os.getenv("GEMINI_MODEL", MODEL_NAME),
+                contents=prompt_text,
                 config=types.GenerateContentConfig(
                     system_instruction=(
                         f"You are the {role} for SmartAgri. "
@@ -330,23 +502,58 @@ async def ask_model(client, role, instruction, payload, output_type):
                     temperature=0,
                     max_output_tokens=4000,
                     response_mime_type="application/json",
-                    response_schema=output_schema,
+                    response_json_schema=output_schema,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                 ),
             )
             break
         except Exception as e:
-            error_str = str(e)
-            if ("503" in error_str or "UNAVAILABLE" in error_str or "429" in error_str or "RESOURCE_EXHAUSTED" in error_str) and attempt < max_retries - 1:
-                print(f"⚠️ Gemini rate limit / busy. Waiting 7 seconds before retry {attempt + 2}...")
-                time.sleep(7) # Free tier eke limit eka nisa seconds 7k wath inna oone
+            error_code = getattr(e, "code", None)
+            error_message = getattr(e, "message", None) or str(e)
+
+            provider_error = isinstance(
+                e,
+                (genai.errors.APIError, httpx.HTTPError),
+            )
+
+            # Show the actual error before retrying or using fallback.
+            print(f"\n❌ [GEMINI API ERROR]")
+            print(f"   Agent:   {role}")
+            print(f"   Model:   {os.getenv('GEMINI_MODEL', MODEL_NAME)}")
+            print(f"   Attempt: {attempt + 1}/{max_retries}")
+            print(f"   Code:    {error_code}")
+            print(f"   Message: {error_message}\n")
+
+            retryable = (
+                error_code in {400, 429, 500, 502, 503, 504}
+                or isinstance(e, httpx.TransportError)
+            )
+
+            if retryable and attempt < max_retries - 1:
+                delay = 15 * (2 ** attempt)
+                print(f"⚠️  Gemini rate limit / busy. Waiting {delay} seconds before retry {attempt + 2}...")
+                await asyncio.sleep(delay)
                 continue
-            raise e
+
+            if provider_error:
+                print(f"⚠️  WARNING: Using local catalog fallback for agent={role} after error code={error_code}.")
+                return local_fallback(payload, output_type)
+
+            raise
 
     content = response.text
     if not content:
-        raise ProposalRejected("Model output was incomplete. Please retry.")
+        logger.warning("Gemini %s returned no structured output; using local fallback.", role)
+        return local_fallback(payload, output_type)
 
-    return output_type.model_validate_json(content)
+    try:
+        return output_type.model_validate_json(content)
+    except ValidationError as ve:
+        print(f"\n❌ [VALIDATION ERROR in {role}]")
+        print(f"Raw output from Gemini:\n{content}\n")
+        print(f"Error details:\n{ve}\n")
+        print(f"⚠️  WARNING: Using local catalog fallback due to invalid JSON.")
+        return local_fallback(payload, output_type)
 
 
 def selection_errors(selection, products, explicit_exclusions):
@@ -391,7 +598,13 @@ def selection_errors(selection, products, explicit_exclusions):
     if len(required) != len(set(required)):
         errors.append("Required product IDs must not repeat.")
 
-    if not eligible:
+    if selection.fixed_list:
+        if eligible != set(required):
+            errors.append("A fixed shopping list must select exactly its available requested products.")
+        if selection.fill_budget or selection.cover_all_categories:
+            errors.append("A fixed shopping list must not fill the budget or add category representatives.")
+
+    if not eligible and not selection.unavailable_items:
         errors.append("No eligible products were selected.")
 
     def category(product):
@@ -427,8 +640,11 @@ def selection_errors(selection, products, explicit_exclusions):
 
 async def generate_proposal(request: ProposalRequest):
     steps = []
+    using_fallback = False
+    _last_gemini_call = 0.0  # monotonic timestamp of last real API call
 
     async def agent(client, name, instruction, payload, output_type):
+        nonlocal using_fallback, _last_gemini_call
         step = {
             "sequence": len(steps) + 1,
             "agent": name,
@@ -437,16 +653,21 @@ async def generate_proposal(request: ProposalRequest):
         }
         steps.append(step)
 
-        result = await ask_model(
-            client,
-            name,
-            instruction,
-            payload,
-            output_type,
-        )
+        if using_fallback:
+            result = local_fallback(payload, output_type)
+        else:
+            # Rate-limit guard: wait between consecutive Gemini calls
+            # to stay within the free-tier RPM limit (≈15 req/min).
+            elapsed = time.monotonic() - _last_gemini_call
+            if _last_gemini_call > 0 and elapsed < 4.0:
+                await asyncio.sleep(4.0 - elapsed)
+            result = await ask_model(client, name, instruction, payload, output_type)
+            _last_gemini_call = time.monotonic()
+        using_fallback = using_fallback or result._used_fallback
 
         step.update({
             "status": "Completed",
+            "source": "LocalCatalog" if result._used_fallback else "Gemini",
             "finished_at": now(),
         })
         return result
@@ -462,7 +683,7 @@ async def generate_proposal(request: ProposalRequest):
             and product.id not in request.excluded_product_ids
         ]
 
-        if not products:
+        if request.products and not products:
             raise ProposalRejected("No eligible food products are available.")
 
         catalog = [
@@ -479,6 +700,8 @@ async def generate_proposal(request: ProposalRequest):
             if api_key
             else None
         )
+        if client is None:
+            print("⚠️  WARNING: No GEMINI_API_KEY found. Using local fallback for all agents.")
         try:
             plan = await agent(
                 client,
@@ -486,7 +709,9 @@ async def generate_proposal(request: ProposalRequest):
                 (
                     "Extract the shopping goal, excluded foods, and "
                     "selection rules from the objective. "
-                    "The supplied budget is a maximum, not an exact target."
+                    "The supplied budget is a maximum, not an exact target. "
+                    "A null budget means no customer spending limit. "
+                    "Preserve named shopping items and quantities."
                 ),
                 {
                     "objective": request.objective,
@@ -508,7 +733,14 @@ async def generate_proposal(request: ProposalRequest):
                 "For an explicit all-categories request, "
                 "set cover_all_categories=true. "
                 "For restricted requests, include only matching products. "
-                "For ONLY named products, do not include unrelated products. "
+                "For a shopping list of named products, include only those products; "
+                "do not add unrelated products even without the word ONLY. "
+                "Set fixed_list=true for such a list. Set fixed_list=false for a "
+                "mixed basket, including mixed baskets that also name required items. "
+                "Recognize clear local-language names, transliterations and "
+                "minor spelling errors (for example gowa/gova means cabbage, "
+                "and amand may mean almond). If a match is ambiguous, put it "
+                "in issues; never guess an unrelated replacement. "
 
                 "Exclude a product only when it actually matches a customer "
                 "exclusion or a supplied explicit excluded ID. "
@@ -524,11 +756,18 @@ async def generate_proposal(request: ProposalRequest):
                 "quantity; otherwise quantity=1 and exact_quantity=false. "
                 "Required products must be eligible and must not repeat. "
                 "Never substitute for an unavailable requested product. "
-                "Report unavailable or ambiguous requirements in issues. "
+                "Report named items absent from the scoped catalog in unavailable_items "
+                "with requested_name copied from the customer and reason=not_available. "
+                "For a quantity above stock, omit that product and report "
+                "reason=insufficient_stock. Never silently reduce a requested quantity. "
+                "Unavailable items are customer notices, NOT blocking issues. "
+                "Continue with all available requested items, or empty eligible/required "
+                "lists if none are available. Do not report excluded foods as missing. "
+                "Reserve issues for ambiguity and contradictory requirements. "
                 "Do not convert weights into packs without conversion data. "
 
                 "Set fill_budget=true for budget-based mixed baskets. "
-                "Set fill_budget=false for a fixed list or an explicit "
+                "Set fill_budget=false when budget_minor is null, for a fixed list or an explicit "
                 "request to minimize spending. "
                 "Return issues=[] when requirements can be satisfied. "
 
@@ -540,6 +779,7 @@ async def generate_proposal(request: ProposalRequest):
             selection_payload = {
                 "objective": request.objective,
                 "plan": plan.model_dump(),
+                "budget_minor": request.budget_minor,
                 "catalog": catalog,
                 "explicit_excluded_product_ids": (
                     request.excluded_product_ids
@@ -555,6 +795,10 @@ async def generate_proposal(request: ProposalRequest):
                     selection_payload,
                     CatalogSelection,
                 )
+
+                # A missing customer budget never authorizes filling stock.
+                if request.budget_minor is None:
+                    selection.fill_budget = False
 
                 errors = selection_errors(
                     selection,
@@ -594,13 +838,19 @@ async def generate_proposal(request: ProposalRequest):
                             "Do not overlook another available category such as "
                             "Cheese unless it is also excluded or incompatible. "
                             "Check required quantities, exact_quantity and "
-                            "fill_budget against the objective. "
+                            "fill_budget and fixed_list against the objective. "
+                            "Accept a partial selection when missing requested items are accurately "
+                            "listed in unavailable_items. Accept an empty selection if all "
+                            "requested items are unavailable. Verify these names against the "
+                            "objective and catalog, including clear transliterations. "
+                            "Reject falsely unavailable items that have a clear available match. "
                             "Do not require unavailable products to be invented. "
                             "Return short factual issues, not private reasoning. "
                             "accepted=true requires issues=[]."
                         ),
                         {
                             "objective": request.objective,
+                            "budget_minor": request.budget_minor,
                             "catalog": catalog,
                             "explicit_excluded_product_ids": (
                                 request.excluded_product_ids
@@ -644,6 +894,17 @@ async def generate_proposal(request: ProposalRequest):
                         mode="json"
                     ),
                     "correction_feedback": errors,
+                }
+
+            unavailable_items = [item.model_dump() for item in selection.unavailable_items]
+            if not selection.eligible_product_ids:
+                return {
+                    "workflow_id": str(request.workflow_id),
+                    "status": "NoProductsAvailable",
+                    "generation_mode": "catalog_fallback" if using_fallback else "ai",
+                    "unavailable_items": unavailable_items,
+                    "steps": steps,
+                    "errors": [],
                 }
 
             eligible_ids = set(selection.eligible_product_ids)
@@ -716,6 +977,9 @@ async def generate_proposal(request: ProposalRequest):
                 (
                     "Check whether this basket satisfies the ORIGINAL "
                     "objective, including excluded foods and product types. "
+                    "Accept available requested items with accurate unavailable_items notices. "
+                    "An unavailable requested item is not a reason to reject the available basket. "
+                    "Never substitute unrelated items or spend extra on a fixed shopping list. "
                     "Reject if an exclusion was missed or a requirement "
                     "cannot be established from the provided data. "
                     "Apply customer exclusions before checking category coverage. "
@@ -728,8 +992,10 @@ async def generate_proposal(request: ProposalRequest):
                 {
                     "objective": request.objective,
                     "plan": plan.model_dump(),
+                    "budget_minor": request.budget_minor,
                     "basket": validation.model_dump(mode="json"),
                     "catalog": catalog,
+                    "explicit_excluded_product_ids": request.excluded_product_ids,
                     "selection": selection.model_dump(mode="json"),
                 },
                 BasketReview,
@@ -744,9 +1010,16 @@ async def generate_proposal(request: ProposalRequest):
             if client is not None:
                 client.close()
 
+        logger.info(
+            "Smart Basket %s completed | status=ProposalReady | generation_mode=%s",
+            request.workflow_id,
+            "catalog_fallback" if using_fallback else "ai",
+        )
         return {
             "workflow_id": str(request.workflow_id),
             "status": "ProposalReady",
+            "generation_mode": "catalog_fallback" if using_fallback else "ai",
+            "unavailable_items": unavailable_items,
             "editing": {
                 "allowed_product_ids": [
                     product.id for product in allowed_products

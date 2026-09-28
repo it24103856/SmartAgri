@@ -205,13 +205,36 @@ function BasketReview({ id, onDecision }) {
           <div className="my-5 grid grid-cols-2 gap-4">
             <div className="rounded-xl bg-gray-50 p-4">
               <p className="text-sm text-gray-500">Budget</p>
-              <p className="font-bold">{money(basket.budget)}</p>
+              <p className="font-bold">{basket.budget == null ? "No budget limit" : money(basket.budget)}</p>
             </div>
             <div className="rounded-xl bg-green-50 p-4">
               <p className="text-sm text-gray-500">Proposed total</p>
               <p className="font-bold">{money(basket.proposedTotal)}</p>
             </div>
           </div>
+
+          {basket.generationMode === "catalog_fallback" && (
+            <p className="mb-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-900">
+              Prepared from catalog matches while AI was unavailable. Review matched products and quantities.
+            </p>
+          )}
+          {basket.customerMessage && (
+            <p className="mb-4 text-sm text-amber-800">{basket.customerMessage}</p>
+          )}
+          {(basket.unavailableItems ?? []).length > 0 && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="font-semibold">Unavailable requested items</p>
+              <ul className="mt-2 list-inside list-disc text-sm">
+                {basket.unavailableItems.map((item, index) => (
+                  <li key={index}>
+                    {item.requestedName} - {item.reason === "insufficient_stock"
+                      ? "Not enough stock for the requested quantity"
+                      : "Not available in the selected catalog"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -424,7 +447,7 @@ export default function SmartBasketManagement() {
                   </div>
                   <p className="my-2">{item.objective}</p>
                   <p className="text-sm text-gray-500">
-                    Budget {money(item.budget)} · Revision {item.proposalRevision}
+                    Budget {item.budget == null ? "No limit" : money(item.budget)} · Revision {item.proposalRevision}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
                     {dateTime(item.updatedAt)}

@@ -287,7 +287,7 @@ public sealed class CustomerCheckoutService
 
             if (smartBasket is not null &&
                 (order.Subtotal != smartBasket.ProposedTotal ||
-                 order.TotalAmount > smartBasket.Budget))
+                 (smartBasket.Budget is decimal basketBudget && order.TotalAmount > basketBudget)))
             {
                 throw new BadHttpRequestException(
                     "Checkout total does not match the approved budget.", 409);
@@ -499,7 +499,7 @@ public sealed class CustomerCheckoutService
         if (workflow.Currency != "LKR" ||
             total <= 0 ||
             total != workflow.ProposedTotal ||
-            total > workflow.Budget)
+            (workflow.Budget is decimal budget && total > budget))
         {
             throw new BadHttpRequestException(
                 "The approved basket total is invalid.", 409);

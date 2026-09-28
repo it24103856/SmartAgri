@@ -33,7 +33,8 @@ public sealed class SmartBasketWorkflow
     public string Objective { get; set; } = "";
 
     [Column(TypeName = "numeric(18,2)")]
-    public decimal Budget { get; set; }
+    // null means the customer supplied no spending limit.
+    public decimal? Budget { get; set; }
 
     [MaxLength(3)]
     public string Currency { get; set; } = "LKR";

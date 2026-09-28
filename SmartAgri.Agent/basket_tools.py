@@ -78,7 +78,7 @@ def validate_basket(
             )
         )
 
-    if total > request.budget_minor:
+    if request.budget_minor is not None and total > request.budget_minor:
         errors.append("The proposed basket exceeds the budget.")
 
     if errors:

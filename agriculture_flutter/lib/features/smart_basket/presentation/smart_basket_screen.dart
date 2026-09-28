@@ -23,6 +23,9 @@ String basketStatus(String status) => switch (status) {
 
 String basketMoney(num value) => 'Rs. ${value.toStringAsFixed(2)}';
 
+String basketBudget(num? value) =>
+    value == null ? 'No budget limit' : basketMoney(value);
+
 class SmartBasketScreen extends StatefulWidget {
   const SmartBasketScreen({super.key});
 
@@ -188,7 +191,9 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
       _pendingCreate = {
         'requestId': PurchaseService.newRequestId(),
         'objective': _objective.text.trim(),
-        'budget': double.parse(_budget.text.trim()),
+        'budget': _budget.text.trim().isEmpty
+            ? null
+            : double.parse(_budget.text.trim()),
         'categoryId': _categoryId == 0 ? null : _categoryId,
       };
     }
@@ -246,9 +251,9 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
         children: [
           const BasketHero(
             eyebrow: 'A LITTLE HELP WITH YOUR HARVEST',
-            title: 'Fresh picks.\nYour budget.',
+            title: 'Your list.\nYour fresh picks.',
             description:
-                'Tell us what you love. We will prepare a basket for you to review before requesting approval.',
+                'Share your shopping list or ask for a mixed basket. Add a budget if you like, then review your picks and any unavailable items.',
             icon: Icons.auto_awesome_outlined,
           ),
           const SizedBox(height: 20),
@@ -267,7 +272,7 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Set your budget and choose your favourites.',
+                    'Choose your favourites. A budget is optional.',
                     style: TextStyle(color: colors.onSurfaceVariant),
                   ),
                   const SizedBox(height: 24),
@@ -278,12 +283,15 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Maximum budget (LKR)',
+                      labelText: 'Maximum budget (LKR, optional)',
+                      helperText: 'Leave blank to price your shopping list.',
+                      helperMaxLines: 2,
                       prefixIcon: Icon(Icons.account_balance_wallet_outlined),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       final text = value?.trim() ?? '';
+                      if (text.isEmpty) return null;
                       final amount = double.tryParse(text);
 
                       if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(text) ||
@@ -339,11 +347,12 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
                     maxLines: 5,
                     decoration: const InputDecoration(
                       labelText: 'What would you like?',
-                      hintText: 'A mixed food basket. Do not include pumpkin.',
+                      hintText:
+                          '2 kg rice, 1 kg apples, 1 cabbage. Or a mixed vegetable basket.',
                       border: OutlineInputBorder(),
                     ),
-                    validator: (value) => (value?.trim().length ?? 0) < 5
-                        ? 'Describe your request using at least 5 characters.'
+                    validator: (value) => (value?.trim().isEmpty ?? true)
+                        ? 'Enter your shopping list or describe your basket.'
                         : null,
                   ),
                   const SizedBox(height: 12),
@@ -456,7 +465,7 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  basketMoney(basket['budget'] as num),
+                                  basketBudget(basket['budget'] as num?),
                                   style: TextStyle(
                                     color: colors.primary,
                                     fontWeight: FontWeight.w800,
@@ -592,10 +601,12 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
       return;
     }
 
-    final budgetMinor = ((basket['budget'] as num).toDouble() * 100).round();
-    final remainingMinor = budgetMinor - (_total * 100).round();
+    final budget = basket['budget'] as num?;
+    final remainingMinor = budget == null
+        ? null
+        : (budget * 100).round() - (_total * 100).round();
 
-    if (remainingMinor <= 0) {
+    if (remainingMinor != null && remainingMinor <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -709,8 +720,11 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
     final status = basket?['status'] as String?;
     final editable = status == 'AwaitingCustomerReview';
     final canEdit = editable && !_busy && _pendingReview == null;
-    final budget = (basket?['budget'] as num?)?.toDouble() ?? 0;
-    final overBudget = (_total * 100).round() > (budget * 100).round();
+    final budget = (basket?['budget'] as num?)?.toDouble();
+    final overBudget =
+        budget != null && (_total * 100).round() > (budget * 100).round();
+    final unavailableItems = (basket?['unavailableItems'] as List?) ?? [];
+    final noneAvailable = status == 'Failed' && unavailableItems.isNotEmpty;
     final colors = Theme.of(context).colorScheme;
     final linkedOrder = basket?['linkedOrder'];
 
@@ -740,7 +754,9 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
               const SizedBox(height: 16),
               BasketHero(
                 eyebrow: 'YOUR PERSONAL BASKET',
-                title: basketStatus(status!),
+                title: noneAvailable
+                    ? 'These items are unavailable'
+                    : basketStatus(status!),
                 description: basket['objective'] as String,
                 icon: status == 'Failed' || status == 'Rejected'
                     ? Icons.info_outline
@@ -763,7 +779,7 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      basketMoney(basket['budget'] as num),
+                      basketBudget(basket['budget'] as num?),
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
@@ -771,11 +787,76 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    BasketBadge(status: status, label: basketStatus(status)),
+                    BasketBadge(
+                      status: status!,
+                      label: noneAvailable
+                          ? 'No available items'
+                          : basketStatus(status),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      switch (basket['generationMode']) {
+                        'ai' => 'Prepared with AI (Gemini)',
+                        'catalog_fallback' => 'Prepared from catalog (fallback)',
+                        _ => 'Preparation source not recorded',
+                      },
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
+              if (basket['generationMode'] == 'catalog_fallback') ...[
+                const GlassCatalogCard(
+                  padding: EdgeInsets.all(18),
+                  child: Text(
+                    'Prepared directly from your shopping list while AI was unavailable. '
+                    'Please review the matched products, selling units and quantities.',
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (unavailableItems.isNotEmpty) ...[
+                GlassCatalogCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: colors.error),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Unavailable items',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        noneAvailable
+                            ? 'None of the requested items could be added. Try another list or food category.'
+                            : 'These items were not added. Review the available items below before submitting.',
+                      ),
+                      const SizedBox(height: 10),
+                      for (final item in unavailableItems)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Text(
+                            '${item['requestedName']} - ${item['reason'] == 'insufficient_stock' ? 'Not enough stock for the requested quantity' : 'Not available in the selected catalog'}',
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               if (const {'Pending', 'Planning', 'Validating'}.contains(status))
                 const Text(
                   'Your basket is being prepared. '
@@ -786,11 +867,12 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                   'Your basket has been submitted. '
                   'Refresh after the admin reviews it.',
                 ),
-              if (status == 'Failed')
-                const Text(
-                  'This request could not be completed. '
-                  'Check product availability or contact the administrator '
-                  'before creating a new request.',
+              if (status == 'Failed' && !noneAvailable)
+                Text(
+                  (basket['customerMessage'] as String?) ??
+                      'This request could not be completed. '
+                          'Check product availability or contact the administrator '
+                          'before creating a new request.',
                 ),
               if (status == 'Rejected')
                 const Text(
@@ -837,7 +919,12 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                                         }),
                                   icon: const Icon(Icons.remove),
                                 ),
-                              Text('Quantity: ${line['quantity']}'),
+                              Expanded(
+                                child: Text(
+                                  'Quantity: ${line['quantity']}',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
                               if (editable)
                                 IconButton(
                                   onPressed:
@@ -851,7 +938,6 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                                         }),
                                   icon: const Icon(Icons.add),
                                 ),
-                              const Spacer(),
                               if (editable)
                                 IconButton(
                                   tooltip: 'Remove product',

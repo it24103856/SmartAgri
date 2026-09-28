@@ -52,12 +52,12 @@ public DbSet<CustomerPayment> CustomerPayments =>
             {
                 table.HasCheckConstraint(
                     "CK_SmartBasketWorkflow_Budget",
-                    "\"Budget\" > 0");
+                    "\"Budget\" IS NULL OR \"Budget\" > 0");
 
                 table.HasCheckConstraint(
                     "CK_SmartBasketWorkflow_Total",
                     "\"ProposedTotal\" >= 0 AND " +
-                    "\"ProposedTotal\" <= \"Budget\"");
+                    "(\"Budget\" IS NULL OR \"ProposedTotal\" <= \"Budget\")");
 
                 table.HasCheckConstraint(
                     "CK_SmartBasketWorkflow_Status",

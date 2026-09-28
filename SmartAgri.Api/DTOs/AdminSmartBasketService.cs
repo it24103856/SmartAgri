@@ -162,6 +162,9 @@ public sealed class AdminSmartBasketService
             workflow.CreatedAt,
             workflow.UpdatedAt,
             linkedOrder,
+            unavailableItems = SmartBasketAvailability.ReadSaved(workflow.ConstraintsJson),
+            generationMode = SmartBasketAvailability.ReadSavedGenerationMode(workflow.ConstraintsJson),
+            customerMessage = SmartBasketAvailability.CustomerMessage(workflow.FailureReason),
             items,
             history,
             decisions
@@ -374,7 +377,7 @@ public sealed class AdminSmartBasketService
 
         if (workflow.Currency != "LKR" ||
             total <= 0 ||
-            total > workflow.Budget ||
+            (workflow.Budget is decimal budget && total > budget) ||
             total != workflow.ProposedTotal)
         {
             throw new BadHttpRequestException(

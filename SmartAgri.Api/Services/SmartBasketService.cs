@@ -56,7 +56,7 @@ public sealed class SmartBasketService
       var canonical = JsonSerializer.Serialize(new
 {
     objective,
-    budget = request.Budget.ToString(
+    budget = request.Budget?.ToString(
         "0.00",
         CultureInfo.InvariantCulture),
     currency = "LKR",
@@ -281,6 +281,9 @@ public sealed class SmartBasketService
             workflow.UpdatedAt,
             workflow.CompletedAt,
             linkedOrder,
+            unavailableItems = SmartBasketAvailability.ReadSaved(workflow.ConstraintsJson),
+            generationMode = SmartBasketAvailability.ReadSavedGenerationMode(workflow.ConstraintsJson),
+            customerMessage = SmartBasketAvailability.CustomerMessage(workflow.FailureReason),
 
             items = workflow.Items
                 .Where(item =>
@@ -684,7 +687,7 @@ public sealed class SmartBasketService
         });
     }
 
-    if (total > workflow.Budget)
+    if (workflow.Budget is decimal budget && total > budget)
     {
         throw new BadHttpRequestException(
             "The basket exceeds your budget.", 400);

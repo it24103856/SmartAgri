@@ -38,7 +38,7 @@ class BasketLine(StrictModel):
 
 class BasketValidationRequest(StrictModel):
     workflow_id: UUID
-    budget_minor: MoneyMinor
+    budget_minor: MoneyMinor | None = None
 
     currency: str = Field(default="LKR", pattern=r"^LKR$")
 

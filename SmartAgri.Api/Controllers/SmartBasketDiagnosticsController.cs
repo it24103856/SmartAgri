@@ -135,7 +135,7 @@ public sealed class SmartBasketDiagnosticsController : ControllerBase
         var payload = new
         {
             workflow_id = workflow.Id,
-            budget_minor = ToMinor(workflow.Budget),
+            budget_minor = workflow.Budget is decimal budget ? (long?)ToMinor(budget) : null,
             currency = workflow.Currency,
 
             products = products.Select(product => new

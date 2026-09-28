@@ -11,11 +11,11 @@ public sealed class CreateSmartBasketRequest : IValidatableObject
     public Guid RequestId { get; set; }
 
     [Required]
-    [StringLength(1000, MinimumLength = 5)]
+    [StringLength(1000, MinimumLength = 1)]
     public string Objective { get; set; } = "";
 
     [Range(typeof(decimal), "1", "1000000")]
-    public decimal Budget { get; set; }
+    public decimal? Budget { get; set; }
 
     public IEnumerable<ValidationResult> Validate(
         ValidationContext validationContext)
@@ -28,14 +28,14 @@ public sealed class CreateSmartBasketRequest : IValidatableObject
         }
 
         if (string.IsNullOrWhiteSpace(Objective) ||
-            Objective.Trim().Length < 5)
+            Objective.Trim().Length < 1)
         {
             yield return new ValidationResult(
-                "Describe what you want using at least 5 characters.",
+                "Enter the products you want or describe your basket.",
                 new[] { nameof(Objective) });
         }
 
-        if (decimal.Round(Budget, 2) != Budget)
+        if (Budget is decimal budget && decimal.Round(budget, 2) != budget)
         {
             yield return new ValidationResult(
                 "Budget can have at most two decimal places.",

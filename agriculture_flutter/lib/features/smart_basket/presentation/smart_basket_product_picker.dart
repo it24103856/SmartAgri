@@ -7,7 +7,7 @@ class SmartBasketProductPicker extends StatefulWidget {
   final String workflowId;
   final String version;
   final Set<int> existingIds;
-  final int remainingMinor;
+  final int? remainingMinor;
 
   const SmartBasketProductPicker({
     super.key,
@@ -104,7 +104,9 @@ class _SmartBasketProductPickerState extends State<SmartBasketProductPicker> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'LEFT TO SPEND',
+                          widget.remainingMinor == null
+                              ? 'SHOPPING LIST'
+                              : 'LEFT TO SPEND',
                           style: TextStyle(
                             color: colors.onSurfaceVariant,
                             fontSize: 11,
@@ -114,7 +116,9 @@ class _SmartBasketProductPickerState extends State<SmartBasketProductPicker> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Rs. ${(widget.remainingMinor / 100).toStringAsFixed(2)}',
+                          widget.remainingMinor == null
+                              ? 'No budget limit'
+                              : 'Rs. ${(widget.remainingMinor! / 100).toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -168,7 +172,9 @@ class _SmartBasketProductPickerState extends State<SmartBasketProductPicker> {
                         final product = visible[index];
                         final price = (product['unitPrice'] as num).toDouble();
                         final priceMinor = (price * 100).round();
-                        final affordable = priceMinor <= widget.remainingMinor;
+                        final affordable =
+                            widget.remainingMinor == null ||
+                            priceMinor <= widget.remainingMinor!;
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),

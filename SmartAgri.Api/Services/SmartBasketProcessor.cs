@@ -134,9 +134,6 @@ public sealed class SmartBasketProcessor
     .Take(51)
     .ToListAsync(ct);
 
-            if (catalog.Count == 0)
-                throw new InvalidOperationException("No eligible products.");
-
             if (catalog.Count > 50)
             {
                 throw new InvalidOperationException(
@@ -147,7 +144,7 @@ public sealed class SmartBasketProcessor
             {
                 workflow_id = workflow.Id,
                 objective = workflow.Objective,
-                budget_minor = ToMinor(workflow.Budget),
+                budget_minor = workflow.Budget is decimal budget ? (long?)ToMinor(budget) : null,
                 currency = workflow.Currency,
                 excluded_product_ids = excludedIds,
                products = catalog.Select(product => new
@@ -170,11 +167,38 @@ public sealed class SmartBasketProcessor
             if (response.GetProperty("workflow_id").GetGuid() != workflowId)
                 throw new InvalidOperationException("Workflow ID mismatch.");
 
+            var unavailableItems = SmartBasketAvailability.ReadAgent(response);
+            var generationMode = SmartBasketAvailability.ReadGenerationMode(response);
+            if (response.GetProperty("status").GetString() == "NoProductsAvailable")
+            {
+                if (unavailableItems.Length == 0)
+                    throw new InvalidOperationException("Missing availability details.");
+
+                _db.ChangeTracker.Clear();
+                var unavailableWorkflow = await FindOwned(workflowId, claimVersion, ct);
+                if (unavailableWorkflow is null)
+                    return;
+
+                unavailableWorkflow.ConstraintsJson = SmartBasketAvailability.Save(
+                    unavailableWorkflow.ConstraintsJson, unavailableItems, generationMode);
+                unavailableWorkflow.Status = SmartBasketStatus.Failed;
+                unavailableWorkflow.FailureReason = "None of the requested items are available.";
+                unavailableWorkflow.UpdatedAt = DateTime.UtcNow;
+                unavailableWorkflow.CompletedAt = unavailableWorkflow.UpdatedAt;
+                unavailableWorkflow.Version = Guid.NewGuid();
+                unavailableWorkflow.LeaseOwner = null;
+                unavailableWorkflow.LeaseExpiresAt = null;
+                await FinishHistory(unavailableWorkflow, attempt, result, "Completed", null, ct);
+                await _db.SaveChangesAsync(ct);
+                return;
+            }
+
             if (response.GetProperty("status").GetString() != "ProposalReady")
             {
                 // Known diagnostic messages only; do not store arbitrary model output.
                 var knownReasons = new HashSet<string>(StringComparer.Ordinal)
                 {
+                    SmartBasketAvailability.SimpleListRequired,
                     "No eligible food products are available.",
                     "Catalog agent returned an unknown ID.",
                     "Catalog selection contains a conflict.",
@@ -306,7 +330,7 @@ public sealed class SmartBasketProcessor
             }
 
             if (totalMinor <= 0 ||
-                totalMinor > ToMinor(current.Budget) ||
+                (current.Budget is decimal currentBudget && totalMinor > ToMinor(currentBudget)) ||
                 totalMinor != validation.GetProperty("total_minor").GetInt64())
             {
                 throw new InvalidOperationException("Proposal total is invalid.");
@@ -376,8 +400,8 @@ public sealed class SmartBasketProcessor
                         })
                         .ToArray());
 
-            current.ConstraintsJson =
-                JsonSerializer.Serialize(savedConstraints);
+            current.ConstraintsJson = SmartBasketAvailability.Save(
+                JsonSerializer.Serialize(savedConstraints), unavailableItems, generationMode);
 
             current.PlanJson = response.GetProperty("plan").GetRawText();
             current.ValidationJson = validation.GetRawText();
@@ -432,7 +456,9 @@ public sealed class SmartBasketProcessor
 
             current.Status = SmartBasketStatus.Failed;
             current.FailureReason =
-                "Proposal could not be generated or verified. " +
+                error is InvalidOperationException && error.Message == SmartBasketAvailability.SimpleListRequired
+                ? SmartBasketAvailability.SimpleListRequired
+                : "Proposal could not be generated or verified. " +
                 "Check the catalog and agent service before submitting again.";
             current.UpdatedAt = DateTime.UtcNow;
             current.CompletedAt = current.UpdatedAt;

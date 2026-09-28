@@ -1,0 +1,96 @@
+{
+  "workflow_id": "00000000-0000-0000-0000-000000000000",
+  "status": "ProposalReady",
+  "generation_mode": "catalog_fallback",
+  "unavailable_items": [],
+  "editing": {
+    "allowed_product_ids": [
+      4,
+      5
+    ],
+    "excluded_product_ids": []
+  },
+  "plan": {
+    "goal": "Prepare the customer's shopping list",
+    "excluded_foods": [],
+    "selection_rules": [
+      "Use catalog matches only; report missing items; respect the supplied budget."
+    ]
+  },
+  "validation": {
+    "workflow_id": "00000000-0000-0000-0000-000000000000",
+    "valid": true,
+    "total_minor": 55000,
+    "currency": "LKR",
+    "items": [
+      {
+        "product_id": 4,
+        "product_name": "Apple",
+        "unit": "pack",
+        "quantity": 1,
+        "unit_price_minor": 50000,
+        "line_total_minor": 50000
+      },
+      {
+        "product_id": 5,
+        "product_name": "Orange",
+        "unit": "piece",
+        "quantity": 1,
+        "unit_price_minor": 5000,
+        "line_total_minor": 5000
+      }
+    ],
+    "errors": []
+  },
+  "steps": [
+    {
+      "sequence": 1,
+      "agent": "Planner",
+      "status": "Completed",
+      "started_at": "2026-09-28T20:57:38.440816+00:00",
+      "source": "LocalCatalog",
+      "finished_at": "2026-09-28T21:01:08.410823+00:00"
+    },
+    {
+      "sequence": 2,
+      "agent": "CatalogAgent",
+      "status": "Completed",
+      "started_at": "2026-09-28T21:01:08.411888+00:00",
+      "source": "LocalCatalog",
+      "finished_at": "2026-09-28T21:01:08.412419+00:00"
+    },
+    {
+      "sequence": 3,
+      "agent": "ReviewAgent",
+      "status": "Completed",
+      "started_at": "2026-09-28T21:01:08.412953+00:00",
+      "source": "LocalCatalog",
+      "finished_at": "2026-09-28T21:01:08.412953+00:00"
+    },
+    {
+      "sequence": 4,
+      "agent": "BasketAgent",
+      "tool": "build_basket",
+      "status": "Completed",
+      "started_at": "2026-09-28T21:01:08.412953+00:00",
+      "finished_at": "2026-09-28T21:01:08.412953+00:00"
+    },
+    {
+      "sequence": 5,
+      "agent": "Validator",
+      "tool": "validate_basket",
+      "status": "Completed",
+      "started_at": "2026-09-28T21:01:08.412953+00:00",
+      "finished_at": "2026-09-28T21:01:08.412953+00:00"
+    },
+    {
+      "sequence": 6,
+      "agent": "ReviewAgent",
+      "status": "Completed",
+      "started_at": "2026-09-28T21:01:08.412953+00:00",
+      "source": "LocalCatalog",
+      "finished_at": "2026-09-28T21:01:08.413961+00:00"
+    }
+  ],
+  "errors": []
+}
