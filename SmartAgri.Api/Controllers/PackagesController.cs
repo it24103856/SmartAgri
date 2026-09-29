@@ -57,6 +57,24 @@ public sealed class PackagesController : ControllerBase
     public Task<IActionResult> Update(int id, [FromBody] SavePackageDto dto)
         => Execute(async () => Ok(await _packages.UpdateAsync(AdminId, id, dto)));
 
+    [HttpPost("with-images")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(32 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 32 * 1024 * 1024)]
+    public Task<IActionResult> CreateWithImages([FromForm] SavePackageImagesDto dto)
+        => Execute(async () =>
+        {
+            var package = await _packages.SaveWithImagesAsync(AdminId, null, dto);
+            return CreatedAtAction(nameof(Get), new { id = package.Id }, package);
+        });
+
+    [HttpPut("{id:int}/with-images")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(32 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 32 * 1024 * 1024)]
+    public Task<IActionResult> UpdateWithImages(int id, [FromForm] SavePackageImagesDto dto)
+        => Execute(async () => Ok(await _packages.SaveWithImagesAsync(AdminId, id, dto)));
+
     [HttpDelete("{id:int}")]
     public Task<IActionResult> Delete(int id, [FromQuery] Guid version)
     {

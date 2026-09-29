@@ -6,7 +6,8 @@ import '../../../products/data/services/catalog_service.dart';
 import '../widgets/farmer_ui.dart';
 
 class FarmerMarketplaceScreen extends StatefulWidget {
-  const FarmerMarketplaceScreen({super.key});
+  final String initialSearch;
+  const FarmerMarketplaceScreen({super.key, this.initialSearch = ''});
   @override
   State<FarmerMarketplaceScreen> createState() =>
       _FarmerMarketplaceScreenState();
@@ -14,9 +15,9 @@ class FarmerMarketplaceScreen extends StatefulWidget {
 
 class _FarmerMarketplaceScreenState extends State<FarmerMarketplaceScreen> {
   late Future<CatalogData> _future = _fetch();
-  final _search = TextEditingController();
+  late final _search = TextEditingController(text: widget.initialSearch);
   int _page = 1;
-  String _query = '';
+  late String _query = widget.initialSearch;
   Future<CatalogData> _fetch() =>
       CatalogService.instance.load(pageSize: 20, page: _page, search: _query);
   Future<void> _load({int? page}) async {

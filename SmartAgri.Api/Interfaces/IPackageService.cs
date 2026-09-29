@@ -4,6 +4,7 @@ namespace SmartAgri.Api.Interfaces;
 
 public interface IPackageService
 {
+    Task<PackageResponseDto> SaveWithImagesAsync(int adminId, int? id, SavePackageImagesDto dto);
     // Admin
     Task<List<PackageResponseDto>> GetAllAsync(int adminId);
     Task<PackageResponseDto> GetByIdAsync(int adminId, int id);

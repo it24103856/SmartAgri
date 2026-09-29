@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/farmer_ui.dart';
+import '../widgets/farmer_glass.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -88,201 +88,322 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FarmerPage(
+    final crops = (_farm.mainCrops ?? '')
+        .split(RegExp(r'[,\u060C]+'))
+        .map((crop) => crop.trim())
+        .where((crop) => crop.isNotEmpty)
+        .toList();
+
+    return FarmerGlassPage(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(_farm.name),
-          backgroundColor: AppColors.surface,
+          title: const Text('Farm overview', style: TextStyle(fontSize: 16)),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: AppColors.textPrimary,
-          elevation: 0,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: IconButton.filledTonal(
+              tooltip: 'Back',
+              style: _toolbarStyle,
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back_rounded, size: 21),
+            ),
+          ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
+            IconButton.filledTonal(
+              style: _toolbarStyle,
+              icon: const Icon(Icons.edit_outlined, size: 20),
               tooltip: 'Edit Farm',
               onPressed: _deleting ? null : _editFarm,
             ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+            IconButton.filledTonal(
+              style: _toolbarStyle,
+              icon: const Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: AppColors.error,
+              ),
               tooltip: 'Delete Farm',
               onPressed: _deleting ? null : _deleteFarm,
             ),
+            const SizedBox(width: 12),
           ],
         ),
         body: _deleting
             ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _imageCarousel(),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _farm.name,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _farm.isActive
-                                      ? AppColors.primary.withValues(
-                                          alpha: 0.12,
-                                        )
-                                      : Colors.grey.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Text(
-                                  _farm.status,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: _farm.isActive
-                                        ? AppColors.primary
-                                        : Colors.grey[700],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_farm.location != null &&
-                              _farm.location!.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Row(
+            : SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _farmHero(),
+                      const SizedBox(height: 28),
+                      _sectionHeading(
+                        'Land, soil & water',
+                        'The essentials of your farm',
+                      ),
+                      const SizedBox(height: 16),
+                      _specsGrid(),
+                      if (crops.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _sectionHeading('Main crops', 'What grows here'),
+                        const SizedBox(height: 14),
+                        FarmerGlassCard(
+                          padding: const EdgeInsets.all(18),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
                               children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: AppColors.primary,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    _farm.location!,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textSecondary,
+                                for (final crop in crops)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 11,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEAF0DE),
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(color: Colors.white),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.eco_rounded,
+                                          size: 19,
+                                          color: Color(0xFF567245),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            crop,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
                               ],
                             ),
-                          ],
-                          const SizedBox(height: 20),
-                          const Text(
-                            'Land, soil & water',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                      if (_farm.description?.trim().isNotEmpty ?? false) ...[
+                        const SizedBox(height: 28),
+                        _sectionHeading(
+                          'About this farm',
+                          'Every plot has a story',
+                        ),
+                        const SizedBox(height: 14),
+                        FarmerGlassCard(
+                          padding: const EdgeInsets.all(22),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Text(
+                              _farm.description!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.7,
+                                color: Color(0xFF656A59),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          _specsGrid(),
-                          if (_farm.mainCrops != null &&
-                              _farm.mainCrops!.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            const Text(
-                              'Main Crops',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
+                        ),
+                      ],
+                      const SizedBox(height: 28),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _editFarm,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF294F3D),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 18,
                             ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _farm.mainCrops!
-                                  .split(RegExp(r'[,،]+'))
-                                  .map((crop) => crop.trim())
-                                  .where((crop) => crop.isNotEmpty)
-                                  .map(
-                                    (crop) => Chip(
-                                      avatar: const Icon(
-                                        Icons.eco,
-                                        size: 16,
-                                        color: AppColors.primary,
-                                      ),
-                                      label: Text(crop),
-                                      backgroundColor: AppColors.soft,
-                                      side: BorderSide.none,
-                                    ),
-                                  )
-                                  .toList(),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
                             ),
-                          ],
-                          if (_farm.description != null &&
-                              _farm.description!.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            const Text(
-                              'About this Farm',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Text(
-                                _farm.description!,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 1.5,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                          ),
+                          icon: const Icon(Icons.tune_rounded, size: 20),
+                          label: const Text('Manage farm details'),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
       ),
     );
   }
 
+  ButtonStyle get _toolbarStyle => IconButton.styleFrom(
+    backgroundColor: Colors.white.withValues(alpha: 0.65),
+    foregroundColor: AppColors.textPrimary,
+    side: const BorderSide(color: Colors.white),
+  );
+
+  Widget _sectionHeading(String title, String subtitle) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12, color: Color(0xFF7D7D6C)),
+      ),
+    ],
+  );
+
+  Widget _farmHero() => Stack(
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: _imageCarousel(),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 236, 12, 0),
+        child: FarmerGlassCard(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text(
+                    'YOUR LAND',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                      color: Color(0xFF867444),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _farm.isActive
+                          ? const Color(0xFFE4EEDB)
+                          : const Color(0xFFEDE9E0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '\u2022  ${_farm.status}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                        fontWeight: FontWeight.w700,
+                        color: _farm.isActive
+                            ? const Color(0xFF4E713F)
+                            : const Color(0xFF756D5B),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _farm.name,
+                style: const TextStyle(
+                  fontSize: 30,
+                  height: 1.15,
+                  letterSpacing: -0.9,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (_farm.location?.trim().isNotEmpty ?? false) ...[
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 17,
+                      color: Color(0xFF7C836D),
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        _farm.location!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF747B65),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+
   Widget _imageCarousel() {
     if (_farm.images.isEmpty) {
-      return Container(
-        height: 200,
+      return SizedBox(
+        height: 280,
         width: double.infinity,
-        color: AppColors.soft,
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Icon(Icons.landscape_outlined, size: 64, color: AppColors.primary),
-            SizedBox(height: 8),
-            Text(
-              'No photos uploaded',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            Image.asset(
+              'assets/images/plants_bg.jpg',
+              fit: BoxFit.cover,
+              alignment: const Alignment(0, -0.25),
+              excludeFromSemantics: true,
+            ),
+            Positioned(
+              top: 14,
+              left: 14,
+              right: 14,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    'Illustration \u00B7 No photos uploaded',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -293,7 +414,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
       alignment: Alignment.bottomCenter,
       children: [
         SizedBox(
-          height: 240,
+          height: 280,
           child: PageView.builder(
             itemCount: _farm.images.length,
             onPageChanged: (i) => setState(() => _activeImageIndex = i),
@@ -311,7 +432,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
                 fit: BoxFit.cover,
                 width: double.infinity,
                 errorBuilder: (_, error, stackTrace) => Container(
-                  color: AppColors.soft,
+                  color: const Color(0xFFFFEBC3),
                   child: const Center(
                     child: Icon(
                       Icons.landscape,
@@ -324,9 +445,39 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
             },
           ),
         ),
-        if (_farm.images.length > 1)
+        Positioned(
+          top: 14,
+          right: 14,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.42),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.photo_library_outlined,
+                  size: 14,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${_activeImageIndex + 1} / ${_farm.images.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_farm.images.length > 1 && _farm.images.length <= 8)
           Positioned(
-            bottom: 12,
+            bottom: 54,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -349,86 +500,84 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
     );
   }
 
-  Widget _specsGrid() {
-    return Column(
-      children: [
-        _specCard(
-          icon: Icons.square_foot,
-          title: 'Total Area',
-          value: _farm.formattedArea,
+  Widget _specsGrid() => LayoutBuilder(
+    builder: (context, constraints) {
+      final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
+      final columns = constraints.maxWidth >= 320 && !largeText ? 2 : 1;
+      final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+      final specs = [
+        (
+          Icons.square_foot_rounded,
+          'Total Area',
+          _farm.formattedArea,
+          const Color(0xFFF8E3B6),
+          const Color(0xFF907034),
         ),
-        _specCard(
-          icon: Icons.grass,
-          title: 'Soil Type',
-          value: _farm.soilType ?? 'Not specified',
+        (
+          Icons.grass_rounded,
+          'Soil Type',
+          _farm.soilType ?? 'Not specified',
+          const Color(0xFFE5ECD7),
+          const Color(0xFF657B46),
         ),
-        _specCard(
-          icon: Icons.water_drop,
-          title: 'Irrigation',
-          value: _farm.irrigationType ?? 'Not specified',
+        (
+          Icons.water_drop_outlined,
+          'Irrigation',
+          _farm.irrigationType ?? 'Not specified',
+          const Color(0xFFE0EDF0),
+          const Color(0xFF56818A),
         ),
-        _specCard(
-          icon: Icons.calendar_today_outlined,
-          title: 'Registered On',
-          value:
-              '${_farm.createdAt.year}-${_farm.createdAt.month.toString().padLeft(2, '0')}-${_farm.createdAt.day.toString().padLeft(2, '0')}',
+        (
+          Icons.calendar_today_outlined,
+          'Registered On',
+          '${_farm.createdAt.year}-${_farm.createdAt.month.toString().padLeft(2, '0')}-${_farm.createdAt.day.toString().padLeft(2, '0')}',
+          const Color(0xFFF0E5D8),
+          const Color(0xFF967854),
         ),
-      ],
-    );
-  }
-
-  Widget _specCard({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
+      ];
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.soft,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 20, color: AppColors.primary),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+          for (final spec in specs)
+            SizedBox(
+              width: width,
+              child: FarmerGlassCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: spec.$4,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(spec.$1, size: 22, color: spec.$5),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      spec.$2,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7D7D6C),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      spec.$3,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  );
 }

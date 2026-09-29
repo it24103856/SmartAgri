@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/farmer_ui.dart';
+import '../widgets/farmer_glass.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -96,15 +97,16 @@ class _MyFarmsScreenState extends State<MyFarmsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FarmerPage(
+    return FarmerGlassPage(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text(
             'My Farms',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
           actions: [
@@ -246,7 +248,7 @@ class _MyFarmsScreenState extends State<MyFarmsScreen> {
 
               return ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                 itemCount: farms.length + 1,
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 14),
@@ -263,7 +265,7 @@ class _MyFarmsScreenState extends State<MyFarmsScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const FarmerHero(
+                        const FarmerGlassHero(
                           eyebrow: 'Land & growing',
                           title: 'Good things start here.',
                           subtitle:
@@ -273,13 +275,13 @@ class _MyFarmsScreenState extends State<MyFarmsScreen> {
                         const SizedBox(height: 16),
                         FarmerMetrics(
                           children: [
-                            FarmerMetric(
+                            FarmerGlassMetric(
                               value: '${farms.length}',
                               label: 'Registered farms',
                               icon: Icons.landscape_outlined,
                             ),
                             for (final area in areas.entries)
-                              FarmerMetric(
+                              FarmerGlassMetric(
                                 value: area.value.toStringAsFixed(1),
                                 label: 'Total ${area.key.toLowerCase()}',
                                 icon: Icons.square_foot,
@@ -325,21 +327,20 @@ class _FarmCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      color: AppColors.surface,
-      clipBehavior: Clip.antiAlias,
+    return FarmerGlassCard(
       child: InkWell(
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top image banner or header
-            _buildImageBanner(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: _buildImageBanner(),
+              ),
+            ),
 
             // Content
             Padding(
@@ -496,18 +497,7 @@ class _FarmCard extends StatelessWidget {
 
   Widget _buildImageBanner() {
     if (farm.thumbnail == null) {
-      return Container(
-        height: 180,
-        width: double.infinity,
-        color: AppColors.soft,
-        child: const Center(
-          child: Icon(
-            Icons.landscape_outlined,
-            size: 48,
-            color: AppColors.primary,
-          ),
-        ),
-      );
+      return const FarmerLandscape();
     }
 
     final path = farm.thumbnail!;
@@ -526,17 +516,7 @@ class _FarmCard extends StatelessWidget {
           child: Image.network(
             absolute,
             fit: BoxFit.cover,
-            errorBuilder: (_, error, stackTrace) => Container(
-              height: 180,
-              color: AppColors.soft,
-              child: const Center(
-                child: Icon(
-                  Icons.landscape,
-                  size: 44,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
+            errorBuilder: (_, error, stackTrace) => const FarmerLandscape(),
           ),
         ),
         if (farm.images.length > 1)
@@ -583,7 +563,7 @@ class _FarmCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(

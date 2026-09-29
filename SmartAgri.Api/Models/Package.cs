@@ -26,6 +26,8 @@ public class Package
     public decimal? RatePerExtraKg { get; set; }
 
     // Hidden from farmers without deleting booking history that references it.
+    public string ImageUrlsJson { get; set; } = "[]";
+
     public bool IsActive { get; set; } = true;
 
     public int CreatedById { get; set; }

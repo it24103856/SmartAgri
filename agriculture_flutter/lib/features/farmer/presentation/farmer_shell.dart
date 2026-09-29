@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_colors.dart';
+import 'widgets/farmer_nav_bar.dart';
+import 'widgets/farmer_glass.dart';
 import 'screens/farmer_dashboard_screen.dart';
 import 'screens/my_farms_screen.dart';
 import 'screens/my_products_screen.dart';
@@ -47,44 +48,14 @@ class _FarmerShellState extends State<FarmerShell> {
           _selectTab(0);
         }
       },
-      child: Scaffold(
-        body: _page(),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: _selectTab,
-          backgroundColor: AppColors.surface,
-          indicatorColor: AppColors.soft,
-          height: 76,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.landscape_outlined),
-              selectedIcon: Icon(Icons.landscape, color: AppColors.primary),
-              label: 'My Farms',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.local_shipping_outlined),
-              selectedIcon: Icon(
-                Icons.local_shipping,
-                color: AppColors.primary,
-              ),
-              label: 'Packages',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon: Icon(Icons.inventory_2, color: AppColors.primary),
-              label: 'Products',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person, color: AppColors.primary),
-              label: 'Profile',
-            ),
-          ],
+      child: FarmerGlassBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: _page(),
+          bottomNavigationBar: FarmerNavBar(
+            selectedIndex: _selectedIndex,
+            onSelected: _selectTab,
+          ),
         ),
       ),
     );

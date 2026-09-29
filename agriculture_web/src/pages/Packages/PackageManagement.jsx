@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   Clock3,
   Loader2,
+  ImagePlus,
+  Leaf,
   Pencil,
   Plus,
   RefreshCw,
@@ -19,10 +21,11 @@ import {
 import api from '../../services/api';
 import '../Categories/CategoryManagement.css';
 import '../Products/ProductManagement.css';
+import './PackageManagement.css';
 
 const CATEGORIES = [
   { value: 'MACHINERY', label: 'Machinery & Land Prep', icon: Tractor, unit: 'acre' },
-  { value: 'INPUTS', label: 'Seeds & Fertilizer', icon: Wheat, unit: 'acre' },
+  { value: 'INPUTS', label: 'Seeds & Fertilizer', icon: Wheat, unit: 'kg' },
   { value: 'TRANSPORT', label: 'Transport & Logistics', icon: Truck, unit: 'km' },
 ];
 
@@ -44,6 +47,7 @@ function categoryMeta(value) {
 }
 
 function getError(error) {
+  if (error.response?.status === 413) return 'Choose up to 6 images, no larger than 5 MB each.';
   if (error.response?.status === 403) {
     return 'Only active administrators can manage packages.';
   }
@@ -73,7 +77,7 @@ function Notice({ text, error = false }) {
   );
 }
 
-function Modal({ title, busy, onClose, children, wide = false }) {
+function Modal({ title, busy, onClose, children, wide = false, className = '' }) {
   const ref = useRef(null);
   const titleId = useId();
 
@@ -89,7 +93,7 @@ function Modal({ title, busy, onClose, children, wide = false }) {
   return (
     <dialog
       ref={ref}
-      className={`cat-dialog product-modal ${wide ? 'product-modal-wide' : ''}`}
+      className={`cat-dialog product-modal ${wide ? 'product-modal-wide' : ''} ${className}`}
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
@@ -126,6 +130,20 @@ function money(value) {
 // Package create/edit form
 // ---------------------------------------------------------------------------
 
+function packageImageSource(path) {
+  return new URL(path, new URL(api.defaults.baseURL, window.location.origin).origin).href;
+}
+
+function PackageImagePreview({ image, alt = '' }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const source = image.file ? URL.createObjectURL(image.file) : packageImageSource(image.url);
+    ref.current.src = source;
+    return () => { if (image.file) URL.revokeObjectURL(source); };
+  }, [image]);
+  return <img ref={ref} alt={alt} className="package-photo" />;
+}
+
 function PackageForm({ pkg, onClose, onSaved }) {
   const [form, setForm] = useState(
     pkg
@@ -146,6 +164,23 @@ function PackageForm({ pkg, onClose, onSaved }) {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const [images, setImages] = useState(() => (pkg?.imageUrls ?? []).map((url) => ({ id: url, url })));
+
+  const addImages = (event) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length + images.length > 6) {
+      setError('Choose up to 6 images per package.');
+      return;
+    }
+    if (files.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size === 0 || file.size > 5 * 1024 * 1024)) {
+      setError('Choose JPG, PNG or WebP images, up to 5 MB each.');
+      return;
+    }
+    setImages((current) => [...current, ...files.map((file) => ({ id: crypto.randomUUID(), file }))]);
+    setError('');
+  };
 
   const isInputs = form.category === 'INPUTS';
   const isTransport = form.category === 'TRANSPORT';
@@ -180,9 +215,21 @@ function PackageForm({ pkg, onClose, onSaved }) {
     };
 
     try {
+      const body = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== null) body.append(key, String(value));
+      });
+      let uploadIndex = 0;
+      const order = images.map((image) => {
+        if (!image.file) return image.url;
+        body.append('Images', image.file);
+        return `new:${uploadIndex++}`;
+      });
+      body.append('ImageOrderJson', JSON.stringify(order));
+      if (pkg) body.append('Version', pkg.version);
       const response = pkg
-        ? await api.put(`/packages/${pkg.id}`, payload)
-        : await api.post('/packages', payload);
+        ? await api.put(`/packages/${pkg.id}/with-images`, body)
+        : await api.post('/packages/with-images', body);
 
       onSaved(response.data);
     } catch (requestError) {
@@ -193,8 +240,16 @@ function PackageForm({ pkg, onClose, onSaved }) {
   };
 
   return (
-    <Modal title={pkg ? 'Edit package' : 'New package'} busy={busy} onClose={onClose}>
-      <form className="cat-form" onSubmit={submit}>
+    <Modal title={pkg ? 'Edit package' : 'New package'} busy={busy} onClose={onClose} wide className="package-editor-modal">
+      <form className="cat-form package-form" onSubmit={submit}>
+        <div className="package-form-intro">
+          <span className="package-intro-icon"><Leaf size={24} /></span>
+          <div><strong>Support a better harvest.</strong><p>Add a service farmers can discover, explore and book.</p></div>
+        </div>
+        <div className="package-form-layout">
+        <div className="package-form-main">
+        <section className="package-form-section">
+          <h3><span>01</span> Package details</h3>
         <label className="cat-field">
           <span>Category</span>
           <select value={form.category} onChange={set('category')} disabled={busy}>
@@ -208,13 +263,15 @@ function PackageForm({ pkg, onClose, onSaved }) {
 
         <label className="cat-field">
           <span>Package name</span>
-          <input value={form.name} onChange={set('name')} required disabled={busy} />
+          <input value={form.name} onChange={set('name')} placeholder="e.g. Harvest transport" minLength={2} maxLength={150} required disabled={busy} />
         </label>
 
         <label className="cat-field">
           <span>Description</span>
           <textarea
-            rows={3}
+            rows={4}
+            maxLength={2000}
+            placeholder="Describe what is included and how it helps the farmer."
             value={form.description}
             onChange={set('description')}
             required
@@ -222,7 +279,10 @@ function PackageForm({ pkg, onClose, onSaved }) {
           />
         </label>
 
-        <div className="product-fields" style={{ gridTemplateColumns: "1fr 1fr", display: "grid", gap: 12 }}>
+        </section>
+        <section className="package-form-section">
+          <h3><span>02</span> Pricing & requirements</h3>
+        <div className="package-fields">
           <label className="cat-field">
             <span>Price per {categoryMeta(form.category).unit} (Rs.)</span>
             <input
@@ -250,7 +310,7 @@ function PackageForm({ pkg, onClose, onSaved }) {
         </div>
 
         {isInputs && (
-          <div className="product-fields" style={{ gridTemplateColumns: "1fr 1fr", display: "grid", gap: 12 }}>
+          <div className="package-fields">
             <label className="cat-field">
               <span>Crop type</span>
               <input
@@ -278,7 +338,7 @@ function PackageForm({ pkg, onClose, onSaved }) {
         )}
 
         {isTransport && (
-          <div className="product-fields" style={{ gridTemplateColumns: "1fr 1fr", display: "grid", gap: 12 }}>
+          <div className="package-fields">
             <label className="cat-field">
               <span>Max load included (kg)</span>
               <input
@@ -306,14 +366,48 @@ function PackageForm({ pkg, onClose, onSaved }) {
           </div>
         )}
 
-        <label className="cat-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        </section>
+        </div>
+        <aside className="package-form-side">
+        <section className="package-image-editor" aria-label="Package images">
+          <h3><span>03</span> Photo gallery</h3>
+          <label className="package-upload-zone">
+            <ImagePlus size={28} />
+            <strong>Add package photos</strong>
+            <span>Choose JPG, PNG or WebP images</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={addImages} disabled={busy || images.length >= 6} aria-describedby="package-images-help" />
+          </label>
+          <p id="package-images-help">Up to 6 images, 5 MB each. The cover appears on the farmer dashboard.</p>
+          <div className="package-image-grid">
+            {images.map((image, index) => (
+              <div className="package-image-item" key={image.id}>
+                <PackageImagePreview image={image} alt={`Package image ${index + 1}`} />
+                <div className="package-image-actions">
+                  <button type="button" className={`cat-button ${index === 0 ? 'cat-button-primary' : ''}`} disabled={busy || index === 0}
+                    onClick={() => setImages((current) => [image, ...current.filter((entry) => entry.id !== image.id)])}>
+                    {index === 0 ? 'Cover image' : 'Set as cover'}
+                  </button>
+                  <button type="button" className="cat-icon-button cat-delete-button" disabled={busy}
+                    aria-label={`Remove image ${index + 1}`} onClick={() => setImages((current) => current.filter((entry) => entry.id !== image.id))}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <label className="package-visibility">
           <input type="checkbox" checked={form.isActive} onChange={set('isActive')} disabled={busy} />
-          <span>Visible to farmers</span>
+          <span><strong>Visible to farmers</strong><small>Turn off to keep this package hidden.</small></span>
         </label>
+        </aside>
+        </div>
 
         {error && <Notice text={error} error />}
 
-        <div className="product-form-actions">
+        <div className="product-form-actions package-form-footer">
+          <span>{images.length} / 6 photos added</span>
           <button type="button" className="cat-button" onClick={onClose} disabled={busy}>
             Cancel
           </button>
@@ -579,9 +673,12 @@ export default function PackageManagement() {
                     return (
                       <tr key={pkg.id}>
                         <td>
-                          <div className="cat-category-text">
-                            <strong>{pkg.name}</strong>
-                            <p>{pkg.description}</p>
+                          <div className="package-table-name">
+                            {pkg.imageUrls?.[0] ? <img className="package-table-cover" src={packageImageSource(pkg.imageUrls[0])} alt="" /> : <span className="cat-avatar"><Icon size={24} /></span>}
+                            <div className="cat-category-text">
+                              <strong>{pkg.name}</strong>
+                              <p>{pkg.description}</p>
+                            </div>
                           </div>
                         </td>
                         <td>

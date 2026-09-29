@@ -15,6 +15,9 @@ class Package {
 
   final bool isActive;
   final String createdByName;
+  final List<String> images;
+
+  String? get thumbnail => images.isEmpty ? null : images.first;
 
   const Package({
     required this.id,
@@ -29,6 +32,7 @@ class Package {
     this.ratePerExtraKg,
     required this.isActive,
     required this.createdByName,
+    this.images = const [],
   });
 
   factory Package.fromJson(Map<String, dynamic> json) {
@@ -45,6 +49,10 @@ class Package {
       ratePerExtraKg: (json['ratePerExtraKg'] as num?)?.toDouble(),
       isActive: json['isActive'] == true,
       createdByName: json['createdByName'] as String? ?? 'Admin',
+      images: (json['imageUrls'] as List? ?? [])
+          .whereType<String>()
+          .where((url) => url.trim().isNotEmpty)
+          .toList(),
     );
   }
 
@@ -62,6 +70,7 @@ class Package {
 
   String get rateLabel {
     if (isTransport) return 'Rs. ${baseRate.toStringAsFixed(2)} / km';
+    if (isMachinery) return 'Rs. ${baseRate.toStringAsFixed(2)} / acre';
     return 'Rs. ${baseRate.toStringAsFixed(2)} / kg';
   }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SmartAgri.Api.Data;
 using SmartAgri.Api.DTOs;
@@ -21,9 +22,12 @@ public class PackageService : IPackageService
 {
     private readonly ApplicationDbContext _db;
 
-    public PackageService(ApplicationDbContext db)
+    private readonly PackageImageStore _images;
+
+    public PackageService(ApplicationDbContext db, PackageImageStore images)
     {
         _db = db;
+        _images = images;
     }
 
     // ---------- shared helpers ----------
@@ -79,7 +83,8 @@ public class PackageService : IPackageService
         p.CreatedBy?.FullName ?? "Unknown",
         p.CreatedAt,
         p.UpdatedAt,
-        p.Version
+        p.Version,
+        JsonSerializer.Deserialize<List<string>>(p.ImageUrlsJson) ?? []
     );
 
     private static BookingResponseDto MapBooking(PackageBooking b) => new(
@@ -246,6 +251,61 @@ public class PackageService : IPackageService
         return Map(package);
     }
 
+    public async Task<PackageResponseDto> SaveWithImagesAsync(
+        int adminId, int? id, SavePackageImagesDto dto)
+    {
+        var admin = await RequireRoleAsync(adminId, "ADMIN");
+        var package = id.HasValue ? await FindPackageAsync(id.Value) : new Package
+        {
+            CreatedById = admin.Id,
+            CreatedBy = admin
+        };
+        if (package.CreatedById != adminId)
+            throw new PackageOperationException(403, "You can only edit your own packages.");
+        if (id.HasValue)
+        {
+            if (!dto.Version.HasValue)
+                throw new PackageOperationException(400, "Package version is required. Refresh and try again.");
+            CheckVersion(package.Version, dto.Version.Value);
+        }
+
+        var previous = JsonSerializer.Deserialize<List<string>>(package.ImageUrlsJson) ?? [];
+        var order = PackageImageOrder.Validate(dto.ImageOrderJson, previous, dto.Images.Count);
+        List<string> uploaded;
+        try
+        {
+            uploaded = await _images.SaveAsync(dto.Images);
+        }
+        catch (BadHttpRequestException error)
+        {
+            throw new PackageOperationException(400, error.Message);
+        }
+        var ordered = order.Select(reference => reference.StartsWith("new:", StringComparison.Ordinal)
+            ? uploaded[int.Parse(reference[4..])]
+            : reference).ToList();
+        try
+        {
+            ApplyDetails(package, dto);
+            package.ImageUrlsJson = JsonSerializer.Serialize(ordered);
+            package.UpdatedAt = id.HasValue ? DateTime.UtcNow : null;
+            package.Version = Guid.NewGuid();
+            if (!id.HasValue) _db.Packages.Add(package);
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _images.DeleteFiles(uploaded);
+            throw new PackageOperationException(409, "This changed elsewhere. Refresh and try again.");
+        }
+        catch
+        {
+            _images.DeleteFiles(uploaded);
+            throw;
+        }
+        _images.DeleteFiles(previous.Except(ordered));
+        return Map(package);
+    }
+
     public async Task DeleteAsync(int adminId, int id, Guid version)
     {
         await RequireRoleAsync(adminId, "ADMIN");
@@ -273,6 +333,7 @@ public class PackageService : IPackageService
 
         _db.Packages.Remove(package);
         await _db.SaveChangesAsync();
+        _images.DeleteFiles(JsonSerializer.Deserialize<List<string>>(package.ImageUrlsJson) ?? []);
     }
 
     public async Task<List<BookingResponseDto>> GetPendingBookingsAsync(int adminId)

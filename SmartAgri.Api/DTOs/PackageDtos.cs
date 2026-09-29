@@ -70,6 +70,17 @@ public class SavePackageDto : IValidatableObject
     }
 }
 
+public class SavePackageImagesDto : SavePackageDto
+{
+    public List<IFormFile> Images { get; set; } = [];
+
+    // Ordered existing URLs and new:0, new:1 ... upload references; first is cover.
+    [Required, StringLength(4000)]
+    public string ImageOrderJson { get; set; } = "[]";
+
+    public Guid? Version { get; set; }
+}
+
 public record PackageResponseDto(
     int Id,
     string Name,
@@ -86,7 +97,8 @@ public record PackageResponseDto(
     string CreatedByName,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
-    Guid Version
+    Guid Version,
+    IReadOnlyList<string> ImageUrls
 );
 
 public class CreateBookingDto

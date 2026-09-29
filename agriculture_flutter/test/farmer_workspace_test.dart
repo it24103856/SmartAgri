@@ -34,7 +34,17 @@ void main() {
         onRequest: (request, handler) {
           requests.add(request);
           Object body = <Object>[];
-          if (request.path == '/farmer-products') {
+          if (request.path == '/catalog/products') {
+            body = {
+              'items': [
+                product(91, 'Community carrots', 'APPROVED'),
+                product(92, 'Another grower pumpkin', 'APPROVED'),
+              ],
+              'totalCount': 2,
+              'page': 1,
+              'pageSize': 8,
+            };
+          } else if (request.path == '/farmer-products') {
             body = {
               'items': request.queryParameters['page'] == 2
                   ? [product(51, 'Pumpkin', 'REJECTED')]
@@ -185,21 +195,130 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dashboard loads real totals on a narrow phone', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(320, 720));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'dashboard shows public products and available packages on a narrow phone',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 720));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final selectedTabs = <int>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FarmerDashboardScreen(
+            fullName: 'Amali Perera',
+            onOpenTab: selectedTabs.add,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        requests.any(
+          (r) =>
+              r.path == '/catalog/products' &&
+              r.queryParameters['sort'] == 'latest',
+        ),
+        isTrue,
+      );
+      expect(requests.any((r) => r.path == '/farmer-products'), isFalse);
+      expect(
+        requests.any((r) => r.path == '/farmer-packages/bookings'),
+        isFalse,
+      );
+      await tester.scrollUntilVisible(
+        find.text('Harvest transport'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Harvest transport'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, 'Distance (km)'), findsOneWidget);
+      Navigator.of(
+        tester.element(find.widgetWithText(TextField, 'Distance (km)')),
+      ).pop();
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Community carrots'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(find.text('Community carrots'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Community carrots'));
+      await tester.pumpAndSettle();
+      expect(find.text('In stock'), findsOneWidget);
+      Navigator.of(tester.element(find.text('In stock'))).pop();
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView).last, const Offset(-200, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Another grower pumpkin'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('dashboard search opens the public marketplace with the query', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: FarmerDashboardScreen(
-          fullName: 'Amali Perera',
-          onOpenTab: (_) {},
-        ),
+        home: FarmerDashboardScreen(fullName: 'Amali', onOpenTab: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Product listings'), 160);
-    expect(find.text('51'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Explore packages'), 180);
+    await tester.enterText(find.byType(TextField), 'pumpkin');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(
+      requests.any(
+        (r) =>
+            r.path == '/catalog/products' &&
+            r.queryParameters['search'] == 'pumpkin',
+      ),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('catalog failure does not hide packages and retry recovers', (
+    tester,
+  ) async {
+    var fail = true;
+    ApiClient.instance.dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (request, handler) {
+          if (request.path == '/catalog/products' && fail) {
+            handler.reject(
+              DioException(
+                requestOptions: request,
+                type: DioExceptionType.connectionError,
+              ),
+            );
+          } else {
+            handler.next(request);
+          }
+        },
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FarmerDashboardScreen(fullName: 'Amali', onOpenTab: (_) {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Harvest transport'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Harvest transport'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Try again'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    fail = false;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(find.text('Community carrots'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

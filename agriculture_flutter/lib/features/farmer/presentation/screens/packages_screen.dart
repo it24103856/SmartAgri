@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 import '../widgets/farmer_ui.dart';
+import '../widgets/farmer_glass.dart';
+import '../widgets/package_images.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../data/models/package_models.dart';
 import '../../data/services/package_service.dart';
+
+Future<bool?> showFarmerPackageBooking(BuildContext context, Package package) =>
+    showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      useSafeArea: true,
+      builder: (_) => FarmerPage(child: _BookingSheet(package: package)),
+    );
 
 class PackagesScreen extends StatefulWidget {
   const PackagesScreen({super.key});
@@ -54,28 +68,20 @@ class _PackagesScreenState extends State<PackagesScreen>
   }
 
   Future<void> _openBooking(Package package) async {
-    final booked = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      useSafeArea: true,
-      builder: (_) => FarmerPage(child: _BookingSheet(package: package)),
-    );
+    final booked = await showFarmerPackageBooking(context, package);
 
     if (booked == true) _loadBookings();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FarmerPage(
+    return FarmerGlassPage(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('Packages'),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
           bottom: TabBar(
@@ -168,7 +174,7 @@ class _PackagesScreenState extends State<PackagesScreen>
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                   children: [
-                    const FarmerHero(
+                    const FarmerGlassHero(
                       eyebrow: 'Support for every season',
                       title: 'A helping hand.\nA better harvest.',
                       subtitle:
@@ -252,51 +258,22 @@ class _PackageCard extends StatelessWidget {
   const _PackageCard({required this.package, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 16),
-    elevation: 0,
-    color: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(22),
-      side: const BorderSide(color: AppColors.border),
-    ),
-    clipBehavior: Clip.antiAlias,
+  Widget build(BuildContext context) => FarmerGlassCard(
+    margin: const EdgeInsets.only(bottom: 18),
     child: InkWell(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            color: package.isTransport
-                ? const Color(0xFFEBF0F5)
-                : package.isInputs
-                ? const Color(0xFFF5F0DF)
-                : AppColors.soft,
-            child: Row(
-              children: [
-                Icon(
-                  _serviceIcon(package.category),
-                  size: 42,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    package.categoryLabel,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.north_east,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: PackageCoverImage(package: package),
+              ),
             ),
           ),
           Padding(
@@ -304,10 +281,29 @@ class _PackageCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF0DE),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    package.categoryLabel,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text(
                   package.name,
                   style: const TextStyle(
-                    fontSize: 21,
+                    fontSize: 22,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
@@ -323,7 +319,7 @@ class _PackageCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 Text(
                   package.rateLabel,
                   style: const TextStyle(
@@ -332,20 +328,22 @@ class _PackageCard extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                 ),
-                if (package.minimumCharge != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Minimum charge: Rs. ${package.minimumCharge!.toStringAsFixed(2)}',
-                      style: const TextStyle(color: AppColors.textSecondary),
+                if (package.minimumCharge != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Minimum charge: Rs. ${package.minimumCharge!.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                const SizedBox(height: 16),
+                ],
+                const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: onTap,
-                    icon: const Icon(Icons.arrow_forward, size: 18),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
                     label: const Text('View details & estimate'),
                   ),
                 ),
@@ -520,7 +518,11 @@ class _BookingSheetState extends State<_BookingSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            if (package.images.isNotEmpty) ...[
+              PackageImageGallery(package: package),
+              const SizedBox(height: 18),
+            ],
             Text(
               package.name,
               style: const TextStyle(

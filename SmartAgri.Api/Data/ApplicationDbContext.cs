@@ -414,6 +414,7 @@ modelBuilder.Entity<CartItem>(entity =>
         modelBuilder.Entity<Package>(entity =>
         {
             entity.ToTable("Packages");
+            entity.Property(p => p.ImageUrlsJson).IsRequired().HasDefaultValue("[]");
             entity.HasKey(p => p.Id);
 
             entity.Property(p => p.Name)
