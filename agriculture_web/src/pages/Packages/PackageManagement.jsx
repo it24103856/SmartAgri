@@ -479,7 +479,7 @@ export default function PackageManagement() {
 
     try {
       if (activeView === 'bookings') {
-        const response = await api.get('/packages/bookings/pending', { signal });
+        const response = await api.get('/packages/bookings', { signal });
         if (!signal?.aborted) setBookings(response.data);
       } else {
         const response = await api.get('/packages', { signal });
@@ -532,7 +532,7 @@ export default function PackageManagement() {
   };
 
   const submitReview = async () => {
-    if (!reviewing) return;
+    if (!reviewing || reviewBusy) return;
 
     if (reviewing.action === 'reject' && reviewNote.trim().length < 3) {
       setError('Enter a short note explaining the rejection.');
@@ -543,20 +543,50 @@ export default function PackageManagement() {
     setError('');
 
     try {
-      await api.post(`/packages/bookings/${reviewing.booking.id}/${reviewing.action}`, {
-        version: reviewing.booking.version,
-        adminNote: reviewNote.trim() || null,
-      });
+      const response = await api.post(
+        `/packages/bookings/${reviewing.booking.id}/${reviewing.action}`,
+        {
+          version: reviewing.booking.version,
+          adminNote: reviewNote.trim() || null,
+        },
+      );
 
-      setBookings((current) => current.filter((b) => b.id !== reviewing.booking.id));
-      setNotice(reviewing.action === 'approve' ? 'Booking confirmed.' : 'Booking rejected.');
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === response.data.id ? response.data : booking,
+        ),
+      );
+
+      const messages = {
+        approve: 'Booking confirmed.',
+        reject: 'Booking rejected.',
+        complete: 'Booking completed.',
+      };
+
+      setNotice(messages[reviewing.action]);
       setReviewing(null);
       setReviewNote('');
     } catch (requestError) {
+      if (requestError.response?.status === 409) {
+        setReviewing(null);
+        await load('bookings');
+      }
       setError(getError(requestError));
     } finally {
       setReviewBusy(false);
     }
+  };
+
+  const reviewLabels = {
+    approve: 'Confirm booking',
+    reject: 'Reject booking',
+    complete: 'Mark completed',
+  };
+
+  const openReview = (booking, action) => {
+    setReviewNote('');
+    setError('');
+    setReviewing({ booking, action });
   };
 
   return (
@@ -662,7 +692,7 @@ export default function PackageManagement() {
                     <th>Category</th>
                     <th>Rate</th>
                     <th>Status</th>
-                    <th aria-label="Actions" />
+                    <th aria-label="    Actions" />
                   </tr>
                 </thead>
                 <tbody>
@@ -741,79 +771,120 @@ export default function PackageManagement() {
         </section>
       ) : (
         <section className="cat-card">
-          <div className="cat-card-heading">
-            <div>
-              <h2>Booking requests</h2>
-              <p>Every farmer's pending booking, across all packages.</p>
-            </div>
-          </div>
+  <div className="cat-card-heading">
+    <div>
+      <h2>Service bookings</h2>
+      <p>Review requests and track confirmed, completed and cancelled services.</p>
+    </div>
 
-          {loading ? (
-            <div className="cat-table-scroll">
-              <Loader2 size={20} className="cat-spin" />
-            </div>
-          ) : bookings.length === 0 ? (
-            <p className="cat-empty">No pending booking requests.</p>
-          ) : (
-            <div className="cat-table-scroll">
-              <table className="cat-table product-table">
-                <thead>
-                  <tr>
-                    <th>Package</th>
-                    <th>Farmer</th>
-                    <th>Details</th>
-                    <th>Total</th>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.map((booking) => (
-                    <tr key={booking.id}>
-                      <td>
-                        <div className="cat-category-text">
-                          <strong>{booking.packageName}</strong>
-                          <p>{categoryMeta(booking.category).label}</p>
-                        </div>
-                      </td>
-                      <td>{booking.farmerName}</td>
-                      <td style={{ fontSize: 13, color: '#4B5F52' }}>
-                        {booking.landSizeAcres && `${booking.landSizeAcres} acres`}
-                        {booking.distanceKm && `${booking.distanceKm} km`}
-                        {booking.loadWeightKg ? `, ${booking.loadWeightKg} kg load` : ''}
-                        {booking.notes && <div>&ldquo;{booking.notes}&rdquo;</div>}
-                      </td>
-                      <td className="product-price">
-                        <strong>{money(booking.totalPrice)}</strong>
-                        <small>{booking.calculatedQuantity} units</small>
-                      </td>
-                      <td>
-                        <div className="cat-row-actions">
-                          <button
-                            type="button"
-                            className="cat-icon-button"
-                            style={{ color: '#2E7D46' }}
-                            onClick={() => setReviewing({ booking, action: 'approve' })}
-                            title="Approve"
-                          >
-                            <CheckCircle2 size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="cat-icon-button cat-delete-button"
-                            onClick={() => setReviewing({ booking, action: 'reject' })}
-                            title="Reject"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+    <button
+      type="button"
+      className="cat-button"
+      onClick={() => load('bookings')}
+      disabled={loading || reviewBusy}
+    >
+      Refresh
+    </button>
+  </div>
+
+  {loading ? (
+    <div className="cat-table-scroll">
+      <Loader2 size={20} className="cat-spin" />
+    </div>
+  ) : bookings.length === 0 ? (
+    <p className="cat-empty">No bookings yet.</p>
+  ) : (
+    <div className="cat-table-scroll">
+      <table className="cat-table product-table">
+        <thead>
+          <tr>
+            <th>Package / Farmer</th>
+            <th>Farm / Date</th>
+            <th>Details</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {bookings.map((booking) => (
+            <tr key={booking.id}>
+              <td>
+                <strong>{booking.packageName}</strong>
+                <div>{booking.farmerName}</div>
+                <small>Booking #{booking.id}</small>
+              </td>
+
+              <td>
+                <strong>{booking.farmName || 'Not recorded'}</strong>
+                <div>{booking.farmLocation || 'Location not recorded'}</div>
+                <div>{booking.serviceDate || 'Date not recorded'}</div>
+              </td>
+
+              <td>
+                {booking.landSizeAcres != null && (
+                  <div>{booking.landSizeAcres} acres</div>
+                )}
+                {booking.distanceKm != null && (
+                  <div>{booking.distanceKm} km</div>
+                )}
+                {booking.loadWeightKg != null && (
+                  <div>{booking.loadWeightKg} kg load</div>
+                )}
+                {booking.category === 'INPUTS' && (
+                  <div>{booking.calculatedQuantity} kg supply</div>
+                )}
+                {booking.notes && <div>Farmer: {booking.notes}</div>}
+                {booking.adminNote && <div>Admin: {booking.adminNote}</div>}
+              </td>
+
+              <td>{money(booking.totalPrice)}</td>
+              <td>{booking.status}</td>
+
+              <td>
+                <div className="cat-row-actions">
+                  {booking.status === 'PENDING' && (
+                    <>
+                      <button
+                        type="button"
+                        className="cat-button cat-button-primary"
+                        disabled={reviewBusy}
+                        onClick={() => openReview(booking, 'approve')}
+                      >
+                        Approve
+                      </button>
+
+                      <button
+                        type="button"
+                        className="cat-button cat-button-danger"
+                        disabled={reviewBusy}
+                        onClick={() => openReview(booking, 'reject')}
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+
+                  {booking.status === 'CONFIRMED' && (
+                    <button
+                      type="button"
+                      className="cat-button cat-button-primary"
+                      disabled={reviewBusy}
+                      onClick={() => openReview(booking, 'complete')}
+                    >
+                      Mark completed
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
       )}
 
       {editor !== undefined && (
@@ -831,50 +902,65 @@ export default function PackageManagement() {
 
       {reviewing && (
         <Modal
-          title={reviewing.action === 'approve' ? 'Confirm booking' : 'Reject booking'}
+          title={reviewLabels[reviewing.action]}
           busy={reviewBusy}
-          onClose={() => setReviewing(null)}
+          onClose={() => {
+            if (!reviewBusy) setReviewing(null);
+          }}
         >
           <div className="cat-form">
             <p>
-              <strong>{reviewing.booking.packageName}</strong> for {reviewing.booking.farmerName} —{' '}
-              {money(reviewing.booking.totalPrice)}
+              <strong>{reviewing.booking.packageName}</strong>
+              {' — '}
+              {reviewing.booking.farmerName}
             </p>
+
+            <p>
+              Farm: {reviewing.booking.farmName || 'Not recorded'}
+              <br />
+              Service date: {reviewing.booking.serviceDate || 'Not recorded'}
+              <br />
+              Total: {money(reviewing.booking.totalPrice)}
+            </p>
+
+            {reviewing.action === 'complete' && (
+              <p>Confirm that this service has actually been delivered.</p>
+            )}
 
             <label className="cat-field">
               <span>
-                Note {reviewing.action === 'reject' ? '(required)' : '(optional)'}
+                Admin note {reviewing.action === 'reject' ? '(required)' : '(optional)'}
               </span>
               <textarea
                 rows={3}
+                maxLength={500}
                 value={reviewNote}
-                onChange={(e) => setReviewNote(e.target.value)}
-                placeholder={
-                  reviewing.action === 'reject'
-                    ? 'Explain why this booking is rejected...'
-                    : 'Any note for the farmer...'
-                }
+                onChange={(event) => setReviewNote(event.target.value)}
                 disabled={reviewBusy}
               />
             </label>
 
             <div className="product-form-actions">
-              <button type="button" className="cat-button" onClick={() => setReviewing(null)} disabled={reviewBusy}>
-                Cancel
-              </button>
               <button
                 type="button"
-                className={`cat-button ${reviewing.action === 'approve' ? 'cat-button-primary' : 'cat-button-danger'}`}
+                className="cat-button"
+                onClick={() => setReviewing(null)}
+                disabled={reviewBusy}
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                className={`cat-button ${
+                  reviewing.action === 'reject'
+                    ? 'cat-button-danger'
+                    : 'cat-button-primary'
+                }`}
                 onClick={submitReview}
                 disabled={reviewBusy}
               >
-                {reviewBusy ? (
-                  <Loader2 size={16} className="cat-spin" />
-                ) : reviewing.action === 'approve' ? (
-                  'Confirm booking'
-                ) : (
-                  'Reject booking'
-                )}
+                {reviewBusy ? 'Saving...' : reviewLabels[reviewing.action]}
               </button>
             </div>
           </div>

@@ -114,4 +114,21 @@ public sealed class PackagesController : ControllerBase
             return StatusCode(exception.StatusCode, new { message = exception.Message });
         }
     }
+
+    [HttpGet("bookings")]
+public Task<IActionResult> AllBookings()
+{
+    return Execute(async () =>
+        Ok(await _packages.GetAllBookingsAsync(AdminId)));
+}
+
+[HttpPost("bookings/{bookingId:int}/complete")]
+public Task<IActionResult> CompleteBooking(
+    int bookingId,
+    [FromBody] ReviewBookingDto dto)
+{
+    return Execute(async () =>
+        Ok(await _packages.CompleteBookingAsync(
+            AdminId, bookingId, dto)));
+}
 }

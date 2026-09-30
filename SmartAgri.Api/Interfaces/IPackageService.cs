@@ -21,4 +21,16 @@ public interface IPackageService
     Task<QuoteResponseDto> QuoteAsync(int farmerId, CreateBookingDto dto);
     Task<BookingResponseDto> CreateBookingAsync(int farmerId, CreateBookingDto dto);
     Task<List<BookingResponseDto>> GetBookingsForFarmerAsync(int farmerId);
+
+    Task<List<BookingResponseDto>> GetAllBookingsAsync(int adminId);
+
+Task<BookingResponseDto> CancelBookingAsync(
+    int farmerId,
+    int bookingId,
+    ChangeBookingStatusDto dto);
+
+Task<BookingResponseDto> CompleteBookingAsync(
+    int adminId,
+    int bookingId,
+    ReviewBookingDto dto);
 }

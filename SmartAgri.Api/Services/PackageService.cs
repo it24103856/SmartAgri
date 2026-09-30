@@ -20,6 +20,14 @@ public class PackageOperationException : Exception
 
 public class PackageService : IPackageService
 {
+    private static DateOnly TodayInSriLanka()
+    {
+        var local = DateTimeOffset.UtcNow.ToOffset(
+            TimeSpan.FromMinutes(330));
+
+        return DateOnly.FromDateTime(local.DateTime);
+    }
+
     private readonly ApplicationDbContext _db;
 
     private readonly PackageImageStore _images;
@@ -103,7 +111,11 @@ public class PackageService : IPackageService
         b.FarmerId,
         b.Farmer?.FullName ?? "Unknown",
         b.CreatedAt,
-        b.Version
+        b.Version,
+        b.FarmId,
+        b.FarmName,
+        b.FarmLocation,
+        b.ServiceDate
     );
 
     private static void ApplyDetails(Package package, SavePackageDto dto)
@@ -351,30 +363,147 @@ public class PackageService : IPackageService
         return bookings.Select(MapBooking).ToList();
     }
 
-    public async Task<BookingResponseDto> ReviewBookingAsync(
-        int adminId, int bookingId, ReviewBookingDto dto, bool approve)
+    public async Task<List<BookingResponseDto>> GetAllBookingsAsync(
+        int adminId)
     {
         await RequireRoleAsync(adminId, "ADMIN");
 
-        var booking = await _db.PackageBookings
+        var bookings = await _db.PackageBookings
             .Include(b => b.Package)
             .Include(b => b.Farmer)
-            .SingleOrDefaultAsync(b => b.Id == bookingId)
-            ?? throw new PackageOperationException(404, "Booking not found.");
+            .AsNoTracking()
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
 
-        if (booking.Status != "PENDING")
+        return bookings.Select(MapBooking).ToList();
+    }
+
+    public Task<BookingResponseDto> ReviewBookingAsync(
+        int adminId,
+        int bookingId,
+        ReviewBookingDto dto,
+        bool approve)
+    {
+        return TransitionBookingAsync(
+            adminId,
+            "ADMIN",
+            bookingId,
+            dto.Version,
+            "PENDING",
+            approve ? "CONFIRMED" : "REJECTED",
+            dto.AdminNote);
+    }
+
+    public Task<BookingResponseDto> CancelBookingAsync(
+        int farmerId,
+        int bookingId,
+        ChangeBookingStatusDto dto)
+    {
+        return TransitionBookingAsync(
+            farmerId,
+            "FARMER",
+            bookingId,
+            dto.Version,
+            "PENDING",
+            "CANCELLED",
+            null);
+    }
+
+    public Task<BookingResponseDto> CompleteBookingAsync(
+        int adminId,
+        int bookingId,
+        ReviewBookingDto dto)
+    {
+        return TransitionBookingAsync(
+            adminId,
+            "ADMIN",
+            bookingId,
+            dto.Version,
+            "CONFIRMED",
+            "COMPLETED",
+            dto.AdminNote);
+    }
+
+    private async Task<BookingResponseDto> TransitionBookingAsync(
+        int actorId,
+        string role,
+        int bookingId,
+        Guid version,
+        string requiredStatus,
+        string nextStatus,
+        string? adminNote)
+    {
+        await RequireRoleAsync(actorId, role);
+
+        if (version == Guid.Empty)
         {
-            throw new PackageOperationException(409, "This booking was already reviewed.");
+            throw new PackageOperationException(
+                400, "Booking version is required. Refresh and try again.");
         }
 
-        CheckVersion(booking.Version, dto.Version);
+        var query = _db.PackageBookings
+            .Include(b => b.Package)
+            .Include(b => b.Farmer)
+            .AsQueryable();
 
-        booking.Status = approve ? "CONFIRMED" : "REJECTED";
-        booking.AdminNote = dto.AdminNote?.Trim();
+        // A farmer can access only their own booking.
+        if (role == "FARMER")
+        {
+            query = query.Where(b => b.FarmerId == actorId);
+        }
+
+        var booking = await query.SingleOrDefaultAsync(
+            b => b.Id == bookingId)
+            ?? throw new PackageOperationException(
+                404, "Booking not found.");
+
+        CheckVersion(booking.Version, version);
+
+        if (booking.Status != requiredStatus)
+        {
+            throw new PackageOperationException(
+                409,
+                $"Only {requiredStatus.ToLowerInvariant()} bookings " +
+                $"can be changed to {nextStatus.ToLowerInvariant()}.");
+        }
+
+        var note = adminNote?.Trim();
+
+        if (nextStatus == "REJECTED" &&
+            (string.IsNullOrWhiteSpace(note) || note.Length < 3))
+        {
+            throw new PackageOperationException(
+                400, "Enter a short rejection reason.");
+        }
+
+        if (nextStatus == "COMPLETED" &&
+            booking.ServiceDate.HasValue &&
+            booking.ServiceDate.Value > TodayInSriLanka())
+        {
+            throw new PackageOperationException(
+                400, "A future service cannot be marked completed.");
+        }
+
+        booking.Status = nextStatus;
+
+        // Preserve the existing admin note if no new note is supplied.
+        if (role == "ADMIN" && !string.IsNullOrWhiteSpace(note))
+        {
+            booking.AdminNote = note;
+        }
+
         booking.UpdatedAt = DateTime.UtcNow;
         booking.Version = Guid.NewGuid();
 
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new PackageOperationException(
+                409, "This booking changed elsewhere. Refresh and try again.");
+        }
 
         return MapBooking(booking);
     }
@@ -416,15 +545,47 @@ public class PackageService : IPackageService
         return new QuoteResponseDto(package.Id, package.Category, quantity, unit, total);
     }
 
-    public async Task<BookingResponseDto> CreateBookingAsync(int farmerId, CreateBookingDto dto)
+    public async Task<BookingResponseDto> CreateBookingAsync(
+        int farmerId,
+        CreateBookingDto dto)
     {
         var farmer = await RequireRoleAsync(farmerId, "FARMER");
+
+        if (dto.FarmId is not > 0)
+        {
+            throw new PackageOperationException(
+                400, "Please select a farm.");
+        }
+
+        var today = TodayInSriLanka();
+
+        if (!dto.ServiceDate.HasValue ||
+            dto.ServiceDate.Value < today ||
+            dto.ServiceDate.Value > today.AddDays(365))
+        {
+            throw new PackageOperationException(
+                400,
+                "Choose a service date from today to the next 365 days.");
+        }
+
+        var farm = await _db.Farms
+            .SingleOrDefaultAsync(f =>
+                f.Id == dto.FarmId.Value &&
+                f.FarmerId == farmerId &&
+                f.Status == "ACTIVE");
+
+        if (farm is null)
+        {
+            throw new PackageOperationException(
+                404, "An active farm belonging to you was not found.");
+        }
 
         var package = await FindPackageAsync(dto.PackageId);
 
         if (!package.IsActive)
         {
-            throw new PackageOperationException(409, "This package is no longer available.");
+            throw new PackageOperationException(
+                409, "This package is no longer available.");
         }
 
         var (quantity, _, total) = Calculate(package, dto);
@@ -435,15 +596,28 @@ public class PackageService : IPackageService
             Package = package,
             FarmerId = farmer.Id,
             Farmer = farmer,
-            LandSizeAcres = dto.LandSizeAcres,
-            DistanceKm = dto.DistanceKm,
-            LoadWeightKg = dto.LoadWeightKg,
+
+            FarmId = farm.Id,
+            Farm = farm,
+            FarmName = farm.Name,
+            FarmLocation = farm.Location,
+            ServiceDate = dto.ServiceDate.Value,
+
+            LandSizeAcres = package.Category == "TRANSPORT"
+                ? null : dto.LandSizeAcres,
+            DistanceKm = package.Category == "TRANSPORT"
+                ? dto.DistanceKm : null,
+            LoadWeightKg = package.Category == "TRANSPORT"
+                ? dto.LoadWeightKg : null,
+
             CalculatedQuantity = quantity,
             TotalPrice = total,
             Status = "PENDING",
-            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
+            Notes = string.IsNullOrWhiteSpace(dto.Notes)
+                ? null : dto.Notes.Trim(),
+
             CreatedAt = DateTime.UtcNow,
-            Version = Guid.NewGuid(),
+            Version = Guid.NewGuid()
         };
 
         _db.PackageBookings.Add(booking);

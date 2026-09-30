@@ -481,6 +481,20 @@ modelBuilder.Entity<CartItem>(entity =>
 
             entity.HasIndex(b => b.Status);
             entity.HasIndex(b => b.FarmerId);
+
+            entity.Property(b => b.ServiceDate)
+    .HasColumnType("date");
+
+entity.Property(b => b.FarmName);
+
+entity.Property(b => b.FarmLocation);
+
+entity.HasOne(b => b.Farm)
+    .WithMany()
+    .HasForeignKey(b => b.FarmId)
+    .OnDelete(DeleteBehavior.SetNull);
+
+entity.HasIndex(b => b.ServiceDate);
         });
     }
 }

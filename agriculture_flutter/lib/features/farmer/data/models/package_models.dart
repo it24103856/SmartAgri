@@ -114,11 +114,16 @@ class PackageBooking {
   final double calculatedQuantity;
   final double totalPrice;
 
-  final String status; // PENDING | CONFIRMED | REJECTED | COMPLETED
+  final String status;
   final String? notes;
   final String? adminNote;
-
   final DateTime createdAt;
+
+  final String version;
+  final int? farmId;
+  final String? farmName;
+  final String? farmLocation;
+  final String? serviceDate;
 
   const PackageBooking({
     required this.id,
@@ -134,6 +139,11 @@ class PackageBooking {
     this.notes,
     this.adminNote,
     required this.createdAt,
+    this.version = '',
+    this.farmId,
+    this.farmName,
+    this.farmLocation,
+    this.serviceDate,
   });
 
   factory PackageBooking.fromJson(Map<String, dynamic> json) {
@@ -151,6 +161,11 @@ class PackageBooking {
       notes: json['notes'] as String?,
       adminNote: json['adminNote'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      version: json['version'] as String? ?? '',
+      farmId: (json['farmId'] as num?)?.toInt(),
+      farmName: json['farmName'] as String?,
+      farmLocation: json['farmLocation'] as String?,
+      serviceDate: json['serviceDate'] as String?,
     );
   }
 }

@@ -6,6 +6,8 @@ import '../widgets/package_images.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../data/models/package_models.dart';
 import '../../data/services/package_service.dart';
+import '../../data/models/farm_model.dart';
+import '../../data/services/farm_service.dart';
 
 Future<bool?> showFarmerPackageBooking(BuildContext context, Package package) =>
     showModalBottomSheet<bool>(
@@ -40,11 +42,17 @@ class _PackagesScreenState extends State<PackagesScreen>
   void initState() {
     super.initState();
     _packagesFuture = PackageService.instance.list();
-    _bookingsFuture = Future.value([]);
+    _bookingsFuture = PackageService.instance.myBookings();
+    PackageService.instance.bookingChanges.addListener(_loadBookings);
     _tab.addListener(() {
-      if (_tab.index == 1 && !_tab.indexIsChanging) _loadBookings();
+      if (_tab.index != _lastTabIndex) {
+        _lastTabIndex = _tab.index;
+        if (_tab.index == 1) _loadBookings();
+      }
     });
   }
+
+  int _lastTabIndex = 0;
 
   void _loadPackages() {
     if (!mounted) return;
@@ -55,7 +63,9 @@ class _PackagesScreenState extends State<PackagesScreen>
 
   Future<void> _loadBookings() async {
     if (!mounted) return;
-    setState(() => _bookingsFuture = PackageService.instance.myBookings());
+    setState(() {
+      _bookingsFuture = PackageService.instance.myBookings();
+    });
     try {
       await _bookingsFuture;
     } catch (_) {}
@@ -63,6 +73,7 @@ class _PackagesScreenState extends State<PackagesScreen>
 
   @override
   void dispose() {
+    PackageService.instance.bookingChanges.removeListener(_loadBookings);
     _tab.dispose();
     super.dispose();
   }
@@ -70,7 +81,10 @@ class _PackagesScreenState extends State<PackagesScreen>
   Future<void> _openBooking(Package package) async {
     final booked = await showFarmerPackageBooking(context, package);
 
-    if (booked == true) _loadBookings();
+    if (!mounted) return;
+    if (booked == true) {
+      _tab.animateTo(1);
+    }
   }
 
   @override
@@ -237,7 +251,13 @@ class _PackagesScreenState extends State<PackagesScreen>
                 'My bookings',
                 subtitle: '${bookings.length} service requests',
               ),
-              ...bookings.map((b) => _BookingTile(booking: b)),
+              ...bookings.map(
+                (b) => _BookingTile(
+                  key: ValueKey(b.id),
+                  booking: b,
+                  onChanged: _loadBookings,
+                ),
+              ),
             ],
           ),
         );
@@ -378,6 +398,7 @@ class _BookingSheetState extends State<_BookingSheet> {
   @override
   void initState() {
     super.initState();
+    _loadFarms();
     for (final controller in [_acres, _distance, _load]) {
       controller.addListener(_invalidateQuote);
     }
@@ -441,6 +462,14 @@ class _BookingSheetState extends State<_BookingSheet> {
 
   Future<void> _book() async {
     if (_quote == null || _busy) return;
+
+    if (_farmId == null || _serviceDate == null) {
+      setState(() {
+        _error = 'Please select a farm and service date.';
+      });
+      return;
+    }
+
     setState(() {
       _busy = true;
       _error = null;
@@ -453,6 +482,8 @@ class _BookingSheetState extends State<_BookingSheet> {
     try {
       await PackageService.instance.book(
         packageId: widget.package.id,
+        farmId: _farmId!,
+        serviceDate: _dateOnly(_serviceDate!),
         landSizeAcres: widget.package.isTransport ? null : acres,
         distanceKm: widget.package.isTransport ? distance : null,
         loadWeightKg: widget.package.isTransport ? load : null,
@@ -551,6 +582,7 @@ class _BookingSheetState extends State<_BookingSheet> {
               ),
             ),
             const SizedBox(height: 16),
+            _farmAndDateFields(),
             if (!package.isTransport)
               TextField(
                 controller: _acres,
@@ -637,7 +669,14 @@ class _BookingSheetState extends State<_BookingSheet> {
             ],
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: (_busy || _quote == null) ? null : _book,
+              onPressed:
+                  (_busy ||
+                      _quote == null ||
+                      _loadingFarms ||
+                      _farmId == null ||
+                      _serviceDate == null)
+                  ? null
+                  : _book,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 minimumSize: const Size.fromHeight(48),
@@ -658,90 +697,274 @@ class _BookingSheetState extends State<_BookingSheet> {
       ),
     );
   }
+
+  List<FarmModel> _farms = [];
+  int? _farmId;
+  DateTime? _serviceDate;
+  bool _loadingFarms = true;
+  String? _farmError;
+
+  DateTime _todayInSriLanka() {
+    final now = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  String _dateOnly(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  Future<void> _loadFarms() async {
+    setState(() {
+      _loadingFarms = true;
+      _farmError = null;
+    });
+
+    try {
+      final farms = await FarmService.instance.list();
+      if (!mounted) return;
+
+      setState(() {
+        _farms = farms.where((farm) => farm.isActive).toList();
+
+        if (!_farms.any((farm) => farm.id == _farmId)) {
+          _farmId = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _farmError = error.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _loadingFarms = false);
+      }
+    }
+  }
+
+  Future<void> _pickServiceDate() async {
+    final today = _todayInSriLanka();
+    final lastDate = today.add(const Duration(days: 365));
+
+    var initialDate = _serviceDate ?? today;
+    if (initialDate.isBefore(today) || initialDate.isAfter(lastDate)) {
+      initialDate = today;
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: lastDate,
+    );
+
+    if (!mounted || picked == null) return;
+
+    setState(() {
+      _serviceDate = picked;
+      _quote = null;
+    });
+  }
+
+  Widget _farmAndDateFields() {
+    if (_loadingFarms) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_farmError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_farmError!, style: const TextStyle(color: Colors.red)),
+          TextButton(
+            onPressed: _loadFarms,
+            child: const Text('Retry loading farms'),
+          ),
+        ],
+      );
+    }
+
+    if (_farms.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Add an active farm from My Farms, then reopen this package.',
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<int>(
+          initialValue: _farmId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Select farm'),
+          items: _farms.map((farm) {
+            return DropdownMenuItem<int>(
+              value: farm.id,
+              child: Text(farm.name, overflow: TextOverflow.ellipsis),
+            );
+          }).toList(),
+          onChanged: _busy
+              ? null
+              : (value) {
+                  setState(() {
+                    _farmId = value;
+                    _quote = null;
+                  });
+                },
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _pickServiceDate,
+          icon: const Icon(Icons.calendar_month_outlined),
+          label: Text(
+            _serviceDate == null
+                ? 'Select service date'
+                : 'Service date: ${_dateOnly(_serviceDate!)}',
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
 }
 
-class _BookingTile extends StatelessWidget {
+class _BookingTile extends StatefulWidget {
   final PackageBooking booking;
+  final Future<void> Function() onChanged;
 
-  const _BookingTile({required this.booking});
+  const _BookingTile({
+    super.key,
+    required this.booking,
+    required this.onChanged,
+  });
+
+  @override
+  State<_BookingTile> createState() => _BookingTileState();
+}
+
+class _BookingTileState extends State<_BookingTile> {
+  bool _busy = false;
+
+  Future<void> _cancel() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cancel booking?'),
+          content: const Text(
+            'This pending service request will be cancelled.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep booking'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Cancel booking'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted || confirmed != true) return;
+
+      await PackageService.instance.cancel(widget.booking);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Booking cancelled.')));
+
+      await widget.onChanged();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+
+      // Refresh the version/status if an admin reviewed it meanwhile.
+      if (error is PackageException && error.statusCode == 409) {
+        await widget.onChanged();
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (booking.status) {
-      'CONFIRMED' => ('Confirmed', const Color(0xFF2E7D46)),
-      'REJECTED' => ('Rejected', AppColors.error),
-      'COMPLETED' => ('Completed', AppColors.textSecondary),
-      _ => ('Pending', const Color(0xFFB8860B)),
+    final booking = widget.booking;
+
+    final color = switch (booking.status) {
+      'CONFIRMED' => const Color(0xFF2E7D46),
+      'COMPLETED' => Colors.blue,
+      'REJECTED' => AppColors.error,
+      'CANCELLED' => Colors.grey,
+      _ => const Color(0xFFB8860B),
     };
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
       color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.border),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    booking.packageName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              booking.packageName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              booking.status,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),
-            Text(
-              'Booking #${booking.id} | ${booking.createdAt.day}/${booking.createdAt.month}/${booking.createdAt.year}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-              ),
-            ),
+            Text('Booking #${booking.id}'),
+            Text('Farm: ${booking.farmName ?? "Not recorded"}'),
+            if (booking.farmLocation?.isNotEmpty == true)
+              Text('Location: ${booking.farmLocation}'),
+            Text('Service date: ${booking.serviceDate ?? "Not recorded"}'),
+            if (booking.landSizeAcres != null)
+              Text('Land: ${booking.landSizeAcres} acres'),
+            if (booking.distanceKm != null)
+              Text('Distance: ${booking.distanceKm} km'),
+            if (booking.loadWeightKg != null)
+              Text('Load: ${booking.loadWeightKg} kg'),
+            if (booking.category == 'INPUTS')
+              Text('Supply quantity: ${booking.calculatedQuantity} kg'),
             const SizedBox(height: 8),
             Text(
-              'Rs. ${booking.totalPrice.toStringAsFixed(2)}',
+              'Total: Rs. ${booking.totalPrice.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            if (booking.adminNote != null && booking.adminNote!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Admin note: ${booking.adminNote}',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
+            if (booking.notes?.isNotEmpty == true)
+              Text('Your note: ${booking.notes}'),
+            if (booking.adminNote?.isNotEmpty == true)
+              Text('Admin note: ${booking.adminNote}'),
+            if (booking.status == 'PENDING') ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _busy || booking.version.isEmpty ? null : _cancel,
+                icon: const Icon(Icons.cancel_outlined),
+                label: Text(_busy ? 'Please wait...' : 'Cancel booking'),
               ),
             ],
           ],

@@ -10,7 +10,7 @@ Package package({List<String>? images}) => Package.fromJson({
   'category': 'MACHINERY',
   'baseRate': 200,
   'isActive': true,
-  if (images != null) 'imageUrls': images,
+  'imageUrls': ?images,
 });
 
 void main() {

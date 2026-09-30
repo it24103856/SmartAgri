@@ -4,6 +4,7 @@ namespace SmartAgri.Api.DTOs;
 
 public class SavePackageDto : IValidatableObject
 {
+
     [Required, StringLength(150, MinimumLength = 2)]
     public string Name { get; set; } = string.Empty;
 
@@ -106,6 +107,11 @@ public class CreateBookingDto
     [Required]
     public int PackageId { get; set; }
 
+    [Range(1, int.MaxValue)]
+    public int? FarmId { get; set; }
+
+    public DateOnly? ServiceDate { get; set; }
+
     [Range(0.01, 100_000)]
     public decimal? LandSizeAcres { get; set; }
 
@@ -143,7 +149,11 @@ public record BookingResponseDto(
     int FarmerId,
     string FarmerName,
     DateTime CreatedAt,
-    Guid Version
+    Guid Version,
+    int? FarmId = null,
+    string? FarmName = null,
+    string? FarmLocation = null,
+    DateOnly? ServiceDate = null
 );
 
 public class ReviewBookingDto
@@ -153,4 +163,8 @@ public class ReviewBookingDto
 
     [StringLength(500)]
     public string? AdminNote { get; set; }
+}
+public class ChangeBookingStatusDto
+{
+    public Guid Version { get; set; }
 }

@@ -2,6 +2,14 @@ namespace SmartAgri.Api.Models;
 
 public class PackageBooking
 {
+    public int? FarmId { get; set; }
+public Farm? Farm { get; set; }
+
+// Preserve the original farm details in booking history.
+public string? FarmName { get; set; }
+public string? FarmLocation { get; set; }
+
+public DateOnly? ServiceDate { get; set; }
     public int Id { get; set; }
 
     public int PackageId { get; set; }
@@ -19,7 +27,8 @@ public class PackageBooking
     public decimal CalculatedQuantity { get; set; }
     public decimal TotalPrice { get; set; }
 
-    public string Status { get; set; } = "PENDING"; // PENDING | CONFIRMED | REJECTED | COMPLETED
+    public string Status { get; set; } = "PENDING";
+    // PENDING | CONFIRMED | REJECTED | CANCELLED | COMPLETED    
     public string? Notes { get; set; }
     public string? AdminNote { get; set; }
 

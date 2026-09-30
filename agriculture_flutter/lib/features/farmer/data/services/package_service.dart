@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../models/package_models.dart';
@@ -19,6 +20,9 @@ class PackageService {
   PackageService._();
 
   static final instance = PackageService._();
+
+  final _bookingChanges = ValueNotifier<int>(0);
+  Listenable get bookingChanges => _bookingChanges;
 
   Dio get _dio => ApiClient.instance.dio;
 
@@ -91,21 +95,37 @@ class PackageService {
 
   Future<PackageBooking> book({
     required int packageId,
+    required int farmId,
+    required String serviceDate,
     double? landSizeAcres,
     double? distanceKm,
     double? loadWeightKg,
     String? notes,
-  }) {
-    return _send(
+  }) async {
+    final booking = await _send(
       () => _dio.post<dynamic>(
         '/farmer-packages/bookings',
         data: {
           'packageId': packageId,
+          'farmId': farmId,
+          'serviceDate': serviceDate,
           'landSizeAcres': ?landSizeAcres,
           'distanceKm': ?distanceKm,
           'loadWeightKg': ?loadWeightKg,
           if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         },
+      ),
+      (data) => PackageBooking.fromJson(Map<String, dynamic>.from(data as Map)),
+    );
+    _bookingChanges.value++;
+    return booking;
+  }
+
+  Future<PackageBooking> cancel(PackageBooking booking) {
+    return _send(
+      () => _dio.post<dynamic>(
+        '/farmer-packages/bookings/${booking.id}/cancel',
+        data: {'version': booking.version},
       ),
       (data) => PackageBooking.fromJson(Map<String, dynamic>.from(data as Map)),
     );

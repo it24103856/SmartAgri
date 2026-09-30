@@ -62,4 +62,15 @@ public sealed class FarmerPackagesController : ControllerBase
             return StatusCode(exception.StatusCode, new { message = exception.Message });
         }
     }
+
+
+    [HttpPost("bookings/{bookingId:int}/cancel")]
+public Task<IActionResult> CancelBooking(
+    int bookingId,
+    [FromBody] ChangeBookingStatusDto dto)
+{
+    return Execute(async () =>
+        Ok(await _packages.CancelBookingAsync(
+            FarmerId, bookingId, dto)));
+}
 }
