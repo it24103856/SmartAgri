@@ -6,6 +6,7 @@ import 'core/network/api_client.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/utils/token_storage.dart';
+import 'core/widgets/app_glass_background.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'splash_screen.dart';
 
@@ -91,6 +92,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),
           themeMode: mode,
+          builder: (context, child) =>
+              AppGlassBackground(child: child ?? const SizedBox.shrink()),
           routes: {'/login': (_) => const LoginScreen()},
           home: _showLogin ? const LoginScreen() : const SplashScreen(),
         );

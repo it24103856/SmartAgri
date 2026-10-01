@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agriculture_flutter/core/widgets/profile_photo_picker.dart';
 import 'package:agriculture_flutter/core/widgets/profile_avatar.dart';
 import 'package:agriculture_flutter/features/auth/data/services/profile_photo.dart';
 import 'package:agriculture_flutter/features/auth/data/services/auth_service.dart';
@@ -22,6 +23,38 @@ CatalogData catalog() => CatalogData.fromJson({
 });
 
 void main() {
+  testWidgets(
+    'photo source sheet offers camera and gallery; cancel returns null',
+    (tester) async {
+      var completed = false;
+      ProfilePhoto? selection = photo;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () async {
+                  selection = await pickProfilePhoto(context);
+                  completed = true;
+                },
+                child: const Text('Change photo'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Change photo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Take photo'), findsOneWidget);
+      expect(find.text('Choose from gallery'), findsOneWidget);
+      Navigator.of(tester.element(find.text('Take photo'))).pop();
+      await tester.pumpAndSettle();
+      expect(completed, isTrue);
+      expect(selection, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('registration shows optional picker, preview and remove action', (
     tester,
   ) async {

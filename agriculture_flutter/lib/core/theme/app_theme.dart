@@ -9,9 +9,7 @@ class AppTheme {
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
 
-    final background = isDark
-        ? const Color(0xFF080D0A)
-        : const Color(0xFFF7F9F8);
+    const background = Colors.transparent;
 
     final colors =
         ColorScheme.fromSeed(
@@ -76,7 +74,7 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colors.surface,
+        fillColor: colors.surface.withValues(alpha: 0.68),
         hintStyle: TextStyle(color: colors.onSurfaceVariant),
         prefixIconColor: colors.onSurfaceVariant,
         suffixIconColor: colors.onSurfaceVariant,
@@ -99,7 +97,7 @@ class AppTheme {
       ),
 
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colors.surface,
+        backgroundColor: colors.surface.withValues(alpha: 0.78),
         indicatorColor: colors.primaryContainer,
         elevation: 0,
       ),
@@ -116,6 +114,23 @@ class AppTheme {
       ),
 
       dividerTheme: DividerThemeData(color: colors.outlineVariant),
+      cardTheme: CardThemeData(
+        color: colors.surface.withValues(alpha: 0.68),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(26),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: isDark ? 0.13 : 0.9),
+          ),
+        ),
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: colors.surface.withValues(alpha: 0.78),
+        selectedItemColor: colors.primary,
+        unselectedItemColor: colors.onSurfaceVariant,
+        elevation: 0,
+      ),
     );
   }
 }

@@ -203,10 +203,10 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   Widget build(BuildContext context) {
     return FarmerPage(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('My Profile'),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.transparent,
           actions: [
             IconButton(
               tooltip: 'Refresh profile',

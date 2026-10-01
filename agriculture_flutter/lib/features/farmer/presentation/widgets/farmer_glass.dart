@@ -37,11 +37,13 @@ class FarmerGlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
+  final bool emphasized;
   const FarmerGlassCard({
     super.key,
     required this.child,
     this.padding = EdgeInsets.zero,
     this.margin = EdgeInsets.zero,
+    this.emphasized = false,
   });
 
   @override
@@ -51,10 +53,18 @@ class FarmerGlassCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(26),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF8C713E).withValues(alpha: 0.08),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
+          color:
+              (emphasized ? const Color(0xFF365E48) : const Color(0xFF8C713E))
+                  .withValues(alpha: emphasized ? 0.16 : 0.08),
+          blurRadius: emphasized ? 28 : 24,
+          offset: Offset(0, emphasized ? 10 : 8),
         ),
+        if (emphasized)
+          BoxShadow(
+            color: const Color(0xFF365E48).withValues(alpha: 0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
       ],
     ),
     child: ClipRRect(
@@ -64,13 +74,19 @@ class FarmerGlassCard extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
+            border: Border.all(
+              color: emphasized
+                  ? const Color(0xFF93B19C).withValues(alpha: 0.65)
+                  : Colors.white.withValues(alpha: 0.9),
+              width: emphasized ? 1.3 : 1,
+            ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withValues(alpha: 0.72),
-                const Color(0xFFFFF5DB).withValues(alpha: 0.42),
+                Colors.white.withValues(alpha: emphasized ? 0.88 : 0.72),
+                (emphasized ? const Color(0xFFF2F7EC) : const Color(0xFFFFF5DB))
+                    .withValues(alpha: emphasized ? 0.68 : 0.42),
               ],
             ),
           ),

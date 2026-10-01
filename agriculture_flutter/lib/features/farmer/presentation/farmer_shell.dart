@@ -7,6 +7,7 @@ import 'screens/my_farms_screen.dart';
 import 'screens/my_products_screen.dart';
 import 'screens/packages_screen.dart';
 import 'screens/farmer_profile_screen.dart';
+import 'screens/farmer_ai_screen.dart';
 
 class FarmerShell extends StatefulWidget {
   final String fullName;
@@ -54,6 +55,8 @@ class _FarmerShellState extends State<FarmerShell> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return PopScope<Object?>(
       canPop: _selectedIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
@@ -65,6 +68,20 @@ class _FarmerShellState extends State<FarmerShell> {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: _page(),
+          floatingActionButton: keyboardOpen || _selectedIndex != 0
+              ? null
+              : FloatingActionButton.extended(
+                  heroTag: 'farmer-ai',
+                  onPressed: () {
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const FarmerAiScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: const Text('Farmer AI'),
+                ),
           bottomNavigationBar: FarmerNavBar(
             selectedIndex: _selectedIndex,
             onSelected: _selectTab,

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/api_constants.dart';
+import '../../core/widgets/app_glass_background.dart';
 import '../../features/auth/data/services/auth_service.dart';
 import '../../features/products/data/services/catalog_service.dart';
 
@@ -129,22 +130,7 @@ class GlassCatalogBackground extends StatelessWidget {
   const GlassCatalogBackground({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF152E27), Color(0xFF15231F), Color(0xFF24251E)]
-              : const [Color(0xFFD5EDE2), Color(0xFFF5F4E9), Color(0xFFFFEAD8)],
-          stops: const [0, 0.5, 1],
-        ),
-      ),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => AppGlassBackground(child: child);
 }
 
 /// Clipped blur keeps the glass effect inside each shopping card.

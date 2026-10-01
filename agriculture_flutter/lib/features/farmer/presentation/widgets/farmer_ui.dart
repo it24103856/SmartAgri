@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// Shared visual language for the farmer workspace.
 class FarmerHero extends StatelessWidget {
@@ -212,7 +213,7 @@ class FarmerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = ThemeData(useMaterial3: true, brightness: Brightness.light);
+    final base = AppTheme.lightTheme();
     return Theme(
       data: base.copyWith(
         colorScheme: ColorScheme.fromSeed(
@@ -221,7 +222,7 @@ class FarmerPage extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white,
+          fillColor: Colors.white.withValues(alpha: 0.68),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 17,

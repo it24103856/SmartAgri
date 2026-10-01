@@ -1,159 +1,124 @@
-import React from 'react';
-import { 
-  Users, ShoppingCart, AlertCircle, Tractor, 
-  Search, Bell, ArrowUpRight 
-} from 'lucide-react';
-import { 
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
-} from 'recharts';
+import { useEffect, useState } from 'react';
+import { ArrowUpRight, ShoppingCart, Package, Sparkles, TrendingUp, RefreshCw } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import UserAvatar from '../../components/UserAvatar';
+import api from '../../services/api';
 
-// Dummy Chart Data
-const salesData = [
-  { month: 'Jan', revenue: 40000, profit: 24000 },
-  { month: 'Feb', revenue: 55000, profit: 32000 },
-  { month: 'Mar', revenue: 70000, profit: 45000 },
-  { month: 'Apr', revenue: 62000, profit: 38000 },
-  { month: 'May', revenue: 85000, profit: 52000 },
-  { month: 'Jun', revenue: 95000, profit: 61000 },
-];
+const money = (value) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(Number(value ?? 0));
+const panel = 'rounded-2xl border border-[#DFE8E0] bg-white p-5 sm:p-6 shadow-sm';
+const button = 'rounded-xl border border-[#DCE7DF] bg-white px-4 py-2 text-sm font-semibold text-[#2D5A40] hover:bg-[#EAF4EE] focus-visible:outline-2 focus-visible:outline-green-600';
 
-const categoryData = [
-  { name: 'Fertilizers', value: 45 },
-  { name: 'Equipment', value: 30 },
-  { name: 'Seeds', value: 25 },
-];
+function Badge({ value }) {
+  const normalized = String(value || '').toUpperCase();
+  const tone = ['PAID', 'DELIVERED', 'CONFIRMED'].includes(normalized)
+    ? 'bg-green-50 text-green-800' : ['CANCELLED', 'FAILED', 'PAYMENTFAILED', 'PAYMENTREVIEW'].includes(normalized)
+      ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800';
+  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{value ? value.replaceAll('_', ' ').replace(/([a-z])([A-Z])/g, '$1 $2') : 'Unknown'}</span>;
+}
 
-const COLORS = ['#2D5A40', '#4E9F6E', '#8EB89B'];
+export default function Dashboard({ admin, profileError, onNavigate }) {
+  const [range, setRange] = useState('This Month');
+  const [retry, setRetry] = useState(0);
+  const [report, setReport] = useState({ loading: true });
+  const [overview, setOverview] = useState({ loading: true });
 
-const Dashboard = () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    api.get('/analytics/sales-profit', { params: { range }, signal: controller.signal, timeout: 15000 })
+      .then(({ data }) => { if (!controller.signal.aborted) setReport({ data }); })
+      .catch(() => { if (!controller.signal.aborted) setReport({ error: 'Could not load sales. Please retry.' }); });
+    return () => controller.abort();
+  }, [range, retry]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const config = { signal: controller.signal, timeout: 15000 };
+    Promise.allSettled([
+      api.get('/products', config),
+      api.get('/admin-smart-baskets', { ...config, params: { page: 1, pageSize: 1 } }),
+      api.get('/admin/orders', { ...config, params: { page: 1, pageSize: 5 } }),
+    ]).then(([products, baskets, orders]) => {
+      if (controller.signal.aborted) return;
+      setOverview({
+        pendingProducts: products.status === 'fulfilled' ? products.value.data.filter((p) => p.status === 'PENDING').length : null,
+        pendingAI: baskets.status === 'fulfilled' ? baskets.value.data.totalCount : null,
+        orders: orders.status === 'fulfilled' ? orders.value.data : null,
+        error: [products, baskets, orders].some((r) => r.status === 'rejected') ? 'Some dashboard data could not be loaded. Please retry.' : '',
+      });
+    });
+    return () => controller.abort();
+  }, [retry]);
+
+  function refresh() {
+    setReport({ loading: true });
+    setOverview({ loading: true });
+    setRetry((v) => v + 1);
+  }
+
+  const value = (amount, loading) => loading ? 'Loading...' : amount ?? 'Unavailable';
+  const cards = [
+    { title: 'Sales Revenue', value: report.data ? money(report.data.summary.totalRevenue) : value(null, report.loading), note: range + ' ? verified payments', icon: TrendingUp },
+    { title: 'Orders', value: value(overview.orders?.totalCount, overview.loading), note: 'All customer orders', icon: ShoppingCart },
+    { title: 'Pending Products', value: value(overview.pendingProducts, overview.loading), note: 'Waiting for product review', icon: Package },
+    { title: 'Pending AI Approvals', value: value(overview.pendingAI, overview.loading), note: 'Smart Baskets awaiting approval', icon: Sparkles },
+  ];
+
   return (
-    <div className="flex-1 bg-[#F4F7F4] p-8 min-h-screen">
-      {/* Top Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1E3A2B]">Welcome Back, Admin! 👋</h1>
-          <p className="text-sm text-gray-500">SmartAgri System Overview & Performance Analytics</p>
-        </div>
-
-        {/* Search & Actions */}
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search products, orders..." 
-              className="pl-10 pr-4 py-2 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E9F6E]"
-            />
-          </div>
-          <button className="p-2 bg-white rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 relative">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-        </div>
+    <div className="space-y-6 text-[#1E3A2B]">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div><p className="mb-1 text-xs font-semibold uppercase tracking-widest text-[#4E9F6E]">SmartAgri Admin</p><h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1><p className="mt-2 text-sm text-gray-500">Welcome back, {admin?.fullName || 'Admin'}. Here is your store at a glance.</p></div>
+        <button className={button + ' flex items-center gap-2'} onClick={refresh}><RefreshCw size={16} /> Refresh</button>
+      </header>
+      {(report.error || overview.error) && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{report.error || overview.error} <button className="underline font-semibold" onClick={refresh}>Retry</button></div>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {cards.map(({ title, value: amount, note, icon: Icon }) => <section key={title} className={panel}><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium text-gray-500">{title}</h2><span className="rounded-xl bg-[#EAF4EE] p-3 text-[#2D5A40]"><Icon size={20} /></span></div><p className="mt-4 text-2xl font-bold break-words" aria-live="polite">{amount}</p><p className="mt-2 text-xs text-gray-500">{note}</p></section>)}
       </div>
-
-      {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-        {[
-          { title: 'Total Customers', val: '1,280', icon: Users, color: 'bg-[#EAF4EE] text-[#1E3A2B]' },
-          { title: 'Pending Orders', val: '24', icon: ShoppingCart, color: 'bg-[#EAF4EE] text-[#1E3A2B]' },
-          { title: 'Farmer Approvals', val: '12', icon: AlertCircle, color: 'bg-[#FFF3E0] text-[#E65100]' },
-          { title: 'Active Packages', val: '45', icon: Tractor, color: 'bg-[#EAF4EE] text-[#1E3A2B]' },
-        ].map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{card.title}</p>
-                <h3 className="text-2xl font-bold text-[#1E3A2B] mt-1">{card.val}</h3>
-              </div>
-              <div className={`p-3 rounded-xl ${card.color}`}>
-                <Icon size={22} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Analytics Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Revenue & Profit Area Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-lg font-bold text-[#1E3A2B]">Revenue vs Profit</h2>
-              <p className="text-xs text-gray-400">Monthly breakdown for the current year</p>
-            </div>
-            <span className="text-xs font-semibold bg-[#EAF4EE] text-[#2D5A40] px-3 py-1 rounded-full">Last 6 Months</span>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section className={panel + ' xl:col-span-2 min-w-0'}>
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-6"><div><h2 className="text-lg font-bold">Sales Revenue</h2><p className="mt-1 text-xs text-gray-500">Verified collections ? Sri Lanka time ? LKR</p></div><select aria-label="Sales date range" className={button} value={range} onChange={(e) => { setReport({ loading: true }); setRange(e.target.value); }}>{['This Week', 'This Month', 'Last 6 Months', 'This Year'].map((r) => <option key={r}>{r}</option>)}</select></div>
+          <div className="h-72">
+            {report.loading ? <p role="status" className="flex h-full items-center justify-center text-gray-500">Loading sales...</p> : report.data ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={report.data.monthlyData} margin={{ top: 10, right: 12, left: 8, bottom: 10 }}><defs><linearGradient id="dashboardSales" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#4E9F6E" stopOpacity={0.3} /><stop offset="100%" stopColor="#4E9F6E" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#EDF2EE" strokeDasharray="4 4" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} /><YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} tickFormatter={(v) => v >= 1000 ? `${v / 1000}k` : v} /><Tooltip formatter={(v) => [money(v), 'Sales Revenue']} contentStyle={{ borderRadius: 12, borderColor: '#DFE8E0' }} /><Area type="monotone" dataKey="revenue" stroke="#4E9F6E" strokeWidth={3} fill="url(#dashboardSales)" /></AreaChart></ResponsiveContainer> : <p className="flex h-full items-center justify-center text-gray-500">Sales data unavailable.</p>}
           </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesData}>
-                <defs>
-                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2D5A40" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#2D5A40" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" stroke="#9CA3AF" fontSize={12} />
-                <YAxis stroke="#9CA3AF" fontSize={12} />
-                <Tooltip />
-                <Area type="monotone" dataKey="revenue" stroke="#2D5A40" fillOpacity={1} fill="url(#colorRev)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          {report.data?.summary.totalRevenue === 0 && <p className="text-sm text-gray-500">No verified payments in this period.</p>}
+          <p className="mt-4 text-xs text-gray-500">Includes paid product orders and approved package receipts. Profit is unavailable because costs and payouts are not recorded.</p>
+        </section>
+        <section className={panel}><h2 className="text-lg font-bold">Pending actions</h2><p className="mt-1 mb-6 text-sm text-gray-500">Review items waiting for your approval.</p><div className="space-y-4">{[
+          { title: 'Product approvals', count: overview.pendingProducts, tab: 'products', icon: Package },
+          { title: 'Smart Basket approvals', count: overview.pendingAI, tab: 'ai-manage', icon: Sparkles },
+        ].map(({ title, count, tab, icon: Icon }) => <button key={tab} onClick={() => onNavigate(tab)} className="flex w-full items-center gap-3 rounded-xl border border-[#DCE7DF] bg-[#F4FAF6] p-4 text-left hover:bg-[#EAF4EE] focus-visible:outline-2 focus-visible:outline-green-600"><Icon size={22} className="shrink-0 text-[#4E9F6E]" /><span className="flex-1"><span className="block text-sm font-semibold">{title}</span><span className="mt-1 block text-xs text-gray-500">{overview.loading ? 'Loading...' : count == null ? 'Count unavailable' : `${count} pending`}</span></span><ArrowUpRight size={18} /></button>)}</div></section>
+      </div>
+      <section className={panel}>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Recent orders</h2><p className="mt-1 text-sm text-gray-500">Latest customer orders across all dates.</p></div><button className={button} onClick={() => onNavigate('orders')}>View all orders</button></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-[#F4FAF6] text-gray-500"><tr>{['Order', 'Customer', 'Amount', 'Payment status', 'Order status'].map((label) => <th key={label} scope="col" className="px-4 py-3 font-medium">{label}</th>)}</tr></thead><tbody className="divide-y divide-[#EDF2EE]">{overview.orders?.items.map((order) => <tr key={order.id} className="hover:bg-green-50/40"><td className="px-4 py-4"><p className="font-semibold">#{order.id}</p><p className="mt-1 text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Colombo' })}</p></td><td className="px-4 py-4 font-medium">{order.fullName}</td><td className="px-4 py-4 font-semibold">{money(order.totalAmount)}</td><td className="px-4 py-4"><Badge value={order.paymentStatus} /></td><td className="px-4 py-4"><Badge value={order.status} /></td></tr>)}{!overview.orders?.items.length && <tr><td colSpan={5} className="py-10 text-center text-gray-500">{overview.loading ? 'Loading orders...' : overview.orders ? 'No orders yet.' : 'Recent orders unavailable.'}</td></tr>}</tbody></table></div>
+      </section>
+      <section aria-label="Your admin profile" className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mb-8">
+        <div className="flex items-center gap-4 mb-5">
+          <UserAvatar user={admin} className="h-20 w-20" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Your profile</p>
+            <h2 className="text-xl font-bold text-[#1E3A2B] break-words">{admin?.fullName || 'Admin'}</h2>
+            <p className="text-sm text-gray-500">System Administrator</p>
           </div>
         </div>
-
-        {/* Sales by Category Pie Chart */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-[#1E3A2B]">Category Share</h2>
-            <p className="text-xs text-gray-400">Distribution by sales volume</p>
-          </div>
-          <div className="h-48 my-auto">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={categoryData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-around text-xs font-medium text-gray-600">
-            {categoryData.map((item, idx) => (
-              <div key={idx} className="flex items-center space-x-1">
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[idx] }}></span>
-                <span>{item.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Action Center */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-        <h2 className="text-lg font-bold text-[#1E3A2B] mb-4">Action Center</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {profileError && <p role="status" className="text-sm text-amber-700 mb-4">{profileError}</p>}
+        <dl className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 text-sm">
           {[
-            { title: 'Pending Farmer Listings', count: '12 Items', path: 'View Products' },
-            { title: 'Equipment Verification', count: '5 Pending', path: 'Review Equipment' },
-            { title: 'AI Recommendations', count: '7 Unreviewed', path: 'Verify Insights' },
-          ].map((action, i) => (
-            <div key={i} className="p-4 bg-[#F4F7F4] rounded-xl flex justify-between items-center hover:bg-[#EAF4EE] transition-all cursor-pointer">
-              <div>
-                <h4 className="font-semibold text-sm text-[#1E3A2B]">{action.title}</h4>
-                <p className="text-xs text-gray-500 mt-0.5">{action.count}</p>
-              </div>
-              <ArrowUpRight size={18} className="text-[#2D5A40]" />
+            ['Email', admin?.email],
+            ['Phone number', admin?.phone],
+            ['Role', admin?.role],
+            ['Account status', admin?.status],
+            ['Address', [admin?.address, admin?.city, admin?.province].filter(Boolean).join(', ')],
+            ['Joined', admin?.createdAt && !Number.isNaN(Date.parse(admin.createdAt)) ? new Date(admin.createdAt).toLocaleDateString() : null],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-gray-500 mb-1">{label}</dt>
+              <dd className="font-medium text-[#1E3A2B] break-words">{value || 'Not provided'}</dd>
             </div>
           ))}
-        </div>
-      </div>
+        </dl>
+      </section>
+
+
     </div>
   );
-};
-
-export default Dashboard;
+}

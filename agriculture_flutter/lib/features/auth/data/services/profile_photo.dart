@@ -7,10 +7,12 @@ class ProfilePhoto {
   final String name;
   const ProfilePhoto(this.bytes, this.name);
 
-  static Future<ProfilePhoto?> pick() async {
+  static Future<ProfilePhoto?> pick({
+    ImageSource source = ImageSource.gallery,
+  }) async {
     try {
       final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
@@ -49,7 +51,9 @@ class ProfilePhoto {
       );
     } on PlatformException {
       throw AuthException(
-        'Could not open your photos. Check photo access in Settings and try again.',
+        source == ImageSource.camera
+            ? 'Could not open the camera. Check camera access in Settings and try again.'
+            : 'Could not open your photos. Check photo access in Settings and try again.',
       );
     }
   }

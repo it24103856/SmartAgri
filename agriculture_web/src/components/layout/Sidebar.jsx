@@ -1,10 +1,10 @@
-import React from 'react';
+import UserAvatar from '../UserAvatar';
 import { 
   LayoutDashboard, Users, ShoppingBag, FolderTree, 
-  PackageCheck, Tractor, Bot, TrendingUp, Settings, LogOut 
+  PackageCheck, Tractor, Bot, TrendingUp, LogOut 
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, admin }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'User Management', icon: Users },
@@ -23,14 +23,11 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
         {/* Profile Header */}
         <div className="flex flex-col items-center mb-8 pr-4">
           <div className="w-16 h-16 rounded-full bg-[#2D5A40] border-2 border-[#4E9F6E] flex items-center justify-center overflow-hidden mb-2 shadow-md">
-            <img 
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" 
-              alt="Admin Profile" 
-              className="w-14 h-14"
-            />
+            <UserAvatar user={admin} className="w-full h-full" />
           </div>
-          <h3 className="font-bold text-base tracking-wide text-[#E2F0D9]">Kavindu Minsara</h3>
+          <h3 className="font-bold text-base tracking-wide text-[#E2F0D9] text-center break-words max-w-full">{admin?.fullName || 'Admin'}</h3>
           <p className="text-xs text-[#8EB89B]">System Administrator</p>
+          <p className="text-xs text-[#8EB89B] mt-1 break-all text-center">{admin?.email}</p>
         </div>
 
         {/* Navigation Links */}

@@ -36,7 +36,7 @@ class _UnsupportedRoleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F8),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: const Color(0xFF3B6E52),
         title: Text('Welcome, $fullName'),

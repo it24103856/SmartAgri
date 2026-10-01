@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/farmer_ui.dart';
+import '../widgets/farmer_glass.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -282,12 +283,13 @@ class _FarmerProductFormScreenState extends State<FarmerProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FarmerPage(
+    return FarmerGlassPage(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(_isEdit ? 'Edit product' : 'Add product'),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
         ),
@@ -297,7 +299,7 @@ class _FarmerProductFormScreenState extends State<FarmerProductFormScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
-                FarmerHero(
+                FarmerGlassHero(
                   eyebrow: 'Your harvest',
                   title: _isEdit
                       ? 'Refresh your listing.'
@@ -325,104 +327,144 @@ class _FarmerProductFormScreenState extends State<FarmerProductFormScreen> {
                       ),
                     ),
                   ),
-                _photoSection(),
+                FarmerGlassCard(
+                  emphasized: true,
+                  padding: const EdgeInsets.all(18),
+                  child: _photoSection(),
+                ),
                 const FarmerSection('02  Listing details'),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _name,
-                  decoration: const InputDecoration(labelText: 'Product name'),
-                  validator: (v) => _required(v, 'Product name'),
-                  enabled: !_saving,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _description,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                  maxLines: 3,
-                  enabled: !_saving,
-                ),
-                const SizedBox(height: 12),
-                _categoryDropdown(),
-                const SizedBox(height: 12),
-                const FarmerSection('03  Price & availability'),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _price,
+                FarmerGlassCard(
+                  emphasized: true,
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _name,
                         decoration: const InputDecoration(
-                          labelText: 'Price (Rs.)',
+                          labelText: 'Product name',
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        validator: _validatePrice,
+                        validator: (v) => _required(v, 'Product name'),
                         enabled: !_saving,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        initialValue: _unit,
-                        decoration: const InputDecoration(labelText: 'Unit'),
-                        items: _units
-                            .map(
-                              (unit) => DropdownMenuItem(
-                                value: unit,
-                                child: Text(unit),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _description,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                        ),
+                        maxLines: 3,
+                        enabled: !_saving,
+                      ),
+                      const SizedBox(height: 12),
+                      _categoryDropdown(),
+                    ],
+                  ),
+                ),
+                const FarmerSection('03  Price & availability'),
+                FarmerGlassCard(
+                  emphasized: true,
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _price,
+                              decoration: const InputDecoration(
+                                labelText: 'Price (Rs.)',
                               ),
-                            )
-                            .toList(),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              validator: _validatePrice,
+                              enabled: !_saving,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              initialValue: _unit,
+                              decoration: const InputDecoration(
+                                labelText: 'Unit',
+                              ),
+                              items: _units
+                                  .map(
+                                    (unit) => DropdownMenuItem(
+                                      value: unit,
+                                      child: Text(unit),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _saving
+                                  ? null
+                                  : (value) => setState(() => _unit = value!),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _stockQuantity,
+                              decoration: const InputDecoration(
+                                labelText: 'Stock quantity',
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: _validateStock,
+                              enabled: !_saving,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _weightKg,
+                              decoration: const InputDecoration(
+                                labelText: 'Weight (kg, optional)',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              validator: _validateWeight,
+                              enabled: !_saving,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _isFood,
                         onChanged: _saving
                             ? null
-                            : (value) => setState(() => _unit = value!),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _stockQuantity,
-                        decoration: const InputDecoration(
-                          labelText: 'Stock quantity',
+                            : (value) => setState(() => _isFood = value),
+                        activeThumbColor: AppColors.primary,
+                        title: const Text('This is a food product'),
+                        subtitle: const Text(
+                          'Adds optional nutrition information',
                         ),
-                        keyboardType: TextInputType.number,
-                        validator: _validateStock,
-                        enabled: !_saving,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _weightKg,
-                        decoration: const InputDecoration(
-                          labelText: 'Weight (kg, optional)',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        validator: _validateWeight,
-                        enabled: !_saving,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _isFood,
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _isFood = value),
-                  activeThumbColor: AppColors.primary,
-                  title: const Text('This is a food product'),
-                  subtitle: const Text('Adds optional nutrition information'),
-                ),
-                if (_isFood) ..._nutritionFields(),
+                if (_isFood) ...[
+                  const FarmerSection('04  Nutrition information'),
+                  FarmerGlassCard(
+                    emphasized: true,
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _nutritionFields(),
+                    ),
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(_error!, style: const TextStyle(color: AppColors.error)),

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import api from './services/api';
 import Sidebar from './components/layout/Sidebar';
 import Login from './pages/Auth/Login';
 
@@ -17,14 +18,46 @@ function App() {
     return !!localStorage.getItem('token');
   });
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [admin, setAdmin] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || 'null');
+    } catch {
+      return null;
+    }
+  });
+  const [profileError, setProfileError] = useState('');
 
-  const handleLogin = () => {
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const controller = new AbortController();
+    api.get('/auth/session', { signal: controller.signal }).then(({ data }) => {
+      setAdmin(data);
+      setProfileError('');
+      localStorage.setItem('user', JSON.stringify(data));
+    }).catch(error => {
+      if (controller.signal.aborted) return;
+      if ([401, 403].includes(error.response?.status)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setAdmin(null);
+        setIsAuthenticated(false);
+      } else {
+        setProfileError('Could not refresh your profile. Showing saved account details.');
+      }
+    });
+    return () => controller.abort();
+  }, [isAuthenticated]);
+
+  const handleLogin = (user) => {
+    setAdmin(user);
+    setProfileError('');
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    setAdmin(null);
     setIsAuthenticated(false);
   };
 
@@ -38,11 +71,12 @@ function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onLogout={handleLogout} 
+        admin={admin}
       />
       
-      <main className="min-w-0 flex-1 bg-[#F4F7F4] p-8 overflow-y-auto">
+      <main className={`min-w-0 flex-1 ${activeTab === 'dashboard' ? 'bg-white' : 'bg-[#F4F7F4]'} p-4 sm:p-8 overflow-y-auto`}>
         <Suspense fallback={<div role="status" className="p-4 text-gray-500">Loading page...</div>}>
-        {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'dashboard' && <Dashboard admin={admin} profileError={profileError} onNavigate={setActiveTab} />}
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'categories' && <CategoryManagement />}
         {activeTab === 'products' && <ProductManagement />}

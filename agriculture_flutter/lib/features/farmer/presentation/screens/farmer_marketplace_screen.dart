@@ -42,7 +42,7 @@ class _FarmerMarketplaceScreenState extends State<FarmerMarketplaceScreen> {
   @override
   Widget build(BuildContext context) => FarmerPage(
     child: Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Marketplace'),
         actions: [
@@ -64,7 +64,7 @@ class _FarmerMarketplaceScreenState extends State<FarmerMarketplaceScreen> {
             ),
           ),
         ],
-        backgroundColor: AppColors.surface,
+        backgroundColor: Colors.transparent,
       ),
       body: RefreshIndicator(
         onRefresh: _load,

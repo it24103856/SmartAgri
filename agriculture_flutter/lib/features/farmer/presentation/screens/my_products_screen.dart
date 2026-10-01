@@ -4,6 +4,7 @@ import '../../../../shared/widgets/catalog_common.dart';
 import '../../data/models/farmer_product_models.dart';
 import '../../data/services/farmer_product_service.dart';
 import '../widgets/farmer_ui.dart';
+import '../widgets/farmer_glass.dart';
 import 'farmer_product_form_screen.dart';
 
 class MyProductsScreen extends StatefulWidget {
@@ -132,12 +133,15 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => FarmerPage(
+  Widget build(BuildContext context) => FarmerGlassPage(
     child: Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('My Products'),
-        backgroundColor: AppColors.surface,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(),
@@ -167,7 +171,7 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 104),
               children: [
-                const FarmerHero(
+                const FarmerGlassHero(
                   eyebrow: 'From farm to market',
                   title: 'Make your harvest stand out.',
                   subtitle:
@@ -192,17 +196,17 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
                   const SizedBox(height: 16),
                   FarmerMetrics(
                     children: [
-                      FarmerMetric(
+                      FarmerGlassMetric(
                         value: '${all.length}',
                         label: 'Total products',
                         icon: Icons.inventory_2_outlined,
                       ),
-                      FarmerMetric(
+                      FarmerGlassMetric(
                         value: '${all.where((p) => p.isApproved).length}',
                         label: 'Approved',
                         icon: Icons.check_circle_outline,
                       ),
-                      FarmerMetric(
+                      FarmerGlassMetric(
                         value: '${all.where((p) => p.isPending).length}',
                         label: 'Awaiting review',
                         icon: Icons.schedule,
@@ -210,54 +214,66 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
                     ],
                   ),
                   const FarmerSection('Your listings'),
-                  TextField(
-                    controller: _search,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Search products or categories',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: query.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear search',
-                              icon: const Icon(Icons.close),
-                              onPressed: () => setState(_search.clear),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final entry in const {
-                        'ALL': 'All',
-                        'APPROVED': 'Approved',
-                        'PENDING': 'Pending',
-                        'REJECTED': 'Rejected',
-                        'ARCHIVED': 'Archived',
-                      }.entries)
-                        ChoiceChip(
-                          label: Text(entry.value),
-                          selected: _status == entry.key,
-                          onSelected: (_) =>
-                              setState(() => _status = entry.key),
+                  FarmerGlassCard(
+                    emphasized: true,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _search,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Search products or categories',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: query.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Clear search',
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () => setState(_search.clear),
+                                  ),
+                          ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  FilterChip(
-                    avatar: const Icon(Icons.inventory_2_outlined, size: 18),
-                    label: Text(
-                      'Low / no stock (${all.where((p) => p.needsRestock).length})',
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final entry in const {
+                              'ALL': 'All',
+                              'APPROVED': 'Approved',
+                              'PENDING': 'Pending',
+                              'REJECTED': 'Rejected',
+                              'ARCHIVED': 'Archived',
+                            }.entries)
+                              ChoiceChip(
+                                label: Text(entry.value),
+                                selected: _status == entry.key,
+                                onSelected: (_) =>
+                                    setState(() => _status = entry.key),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        FilterChip(
+                          avatar: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 18,
+                          ),
+                          label: Text(
+                            'Low / no stock (${all.where((p) => p.needsRestock).length})',
+                          ),
+                          selected: _stockOnly,
+                          onSelected: (selected) {
+                            setState(() {
+                              _stockOnly = selected;
+                              if (selected) _status = 'ALL';
+                            });
+                          },
+                        ),
+                      ],
                     ),
-                    selected: _stockOnly,
-                    onSelected: (selected) {
-                      setState(() {
-                        _stockOnly = selected;
-                        if (selected) _status = 'ALL';
-                      });
-                    },
                   ),
                   const SizedBox(height: 16),
                   if (all.isEmpty)
@@ -324,15 +340,9 @@ class _ProductTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white,
-    elevation: 0,
+  Widget build(BuildContext context) => FarmerGlassCard(
+    emphasized: true,
     margin: const EdgeInsets.only(bottom: 16),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-      side: const BorderSide(color: AppColors.border),
-    ),
-    clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: busy ? null : onTap,
       child: Padding(

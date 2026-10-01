@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/profile_photo_picker.dart';
 
 import '../../../core/utils/token_storage.dart';
 import '../../auth/data/models/user_model.dart';
@@ -71,7 +72,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      final photo = await ProfilePhoto.pick();
+      final photo = await pickProfilePhoto(context);
 
       if (!mounted || photo == null) return;
 

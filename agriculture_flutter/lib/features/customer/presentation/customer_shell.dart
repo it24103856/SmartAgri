@@ -36,10 +36,9 @@ class _CustomerShellState extends State<CustomerShell> {
       if (action == null) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
-          builder: (_) => CustomerComposerScreen(
-            draft: _draft,
-            openCamera: action == CustomerCreateAction.camera,
-          ),
+          builder: (_) => action == CustomerCreateAction.text
+              ? const SmartBasketScreen()
+              : CustomerComposerScreen(draft: _draft, openCamera: true),
         ),
       );
     } finally {

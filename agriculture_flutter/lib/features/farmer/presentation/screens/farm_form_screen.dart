@@ -226,10 +226,10 @@ class _FarmFormScreenState extends State<FarmFormScreen> {
   Widget build(BuildContext context) {
     return FarmerPage(
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(_isEdit ? 'Edit Farm' : 'Add New Farm'),
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.transparent,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
         ),

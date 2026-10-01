@@ -667,9 +667,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
+          backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
           title: Text(
             _review ? 'Review & payment' : 'Checkout',

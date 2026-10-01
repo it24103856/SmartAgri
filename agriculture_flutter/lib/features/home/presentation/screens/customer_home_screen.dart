@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/profile_photo_picker.dart';
 import '../../../../core/widgets/profile_avatar.dart';
 import '../../../auth/data/services/profile_photo.dart';
 import '../../data/catalog_service.dart';
@@ -97,7 +98,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   Future<void> _changePhoto() async {
     setState(() => _updatingPhoto = true);
     try {
-      final photo = await (widget.pickPhoto ?? ProfilePhoto.pick)();
+      final photo =
+          await (widget.pickPhoto?.call() ?? pickProfilePhoto(context));
       if (photo == null || !mounted) return;
       final url =
           await (widget.uploadPhoto ?? AuthService.instance.updateProfilePhoto)(

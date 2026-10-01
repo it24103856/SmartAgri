@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/profile_photo_picker.dart';
 import '../../../../core/widgets/profile_avatar.dart';
 import '../../data/services/profile_photo.dart';
 import '../../data/services/auth_service.dart';
@@ -43,7 +44,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _pickPhoto() async {
     setState(() => _pickingPhoto = true);
     try {
-      final photo = await (widget.pickPhoto ?? ProfilePhoto.pick)();
+      final photo =
+          await (widget.pickPhoto?.call() ?? pickProfilePhoto(context));
       if (mounted && photo != null) setState(() => _photo = photo);
     } catch (error) {
       if (mounted) {
