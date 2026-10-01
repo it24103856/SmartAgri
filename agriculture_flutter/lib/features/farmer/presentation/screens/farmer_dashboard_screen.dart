@@ -193,6 +193,47 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                 style: const TextStyle(fontSize: 15, color: Color(0xFF74765D)),
               ),
               const SizedBox(height: 16),
+              FarmerGlassCard(
+                child: TextField(
+                  controller: _search,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (value) => _openMarketplace(search: value),
+                  decoration: InputDecoration(
+                    hintText: 'Search fresh products...',
+                    hintStyle: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF85846E),
+                    ),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                    ),
+                    suffixIcon: IconButton(
+                      tooltip: 'Search marketplace',
+                      onPressed: () => _openMarketplace(search: _search.text),
+                      icon: const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _hero(),
+              const SizedBox(height: 16),
+              _heading(
+                'My Packages',
+                () => widget.onOpenTab(2),
+                'See all packages',
+              ),
+              const SizedBox(height: 8),
+              _packageSection(),
+              const SizedBox(height: 18),
               _summarySection(),
               const SizedBox(height: 12),
               Wrap(
@@ -274,47 +315,6 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              FarmerGlassCard(
-                child: TextField(
-                  controller: _search,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (value) => _openMarketplace(search: value),
-                  decoration: InputDecoration(
-                    hintText: 'Search fresh products...',
-                    hintStyle: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF85846E),
-                    ),
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: AppColors.primary,
-                    ),
-                    suffixIcon: IconButton(
-                      tooltip: 'Search marketplace',
-                      onPressed: () => _openMarketplace(search: _search.text),
-                      icon: const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              _hero(),
-              const SizedBox(height: 16),
-              _heading(
-                'Farm packages',
-                () => widget.onOpenTab(2),
-                'See all packages',
-              ),
-              const SizedBox(height: 8),
-              _packageSection(),
               const SizedBox(height: 18),
               _heading(
                 'Latest products',

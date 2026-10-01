@@ -6,6 +6,7 @@ from basket_agents import ProposalRequest, generate_proposal
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
+from farmer_ai import FarmAnalysisRequest, analyze_farm
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -110,3 +111,30 @@ async def propose_basket(request: ProposalRequest):
         )
     finally:
         proposal_lock.release()
+
+
+farm_analysis_lock = asyncio.Lock()
+
+
+@app.post(
+    "/internal/analyze-farm",
+    dependencies=[Depends(require_internal_key)],
+)
+async def analyze_farmer_farm(
+    request: FarmAnalysisRequest,
+):
+    try:
+        await asyncio.wait_for(
+            farm_analysis_lock.acquire(),
+            timeout=0.1,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=429,
+            detail="Farmer AI is busy. Please retry shortly.",
+        )
+
+    try:
+        return await analyze_farm(request)
+    finally:
+        farm_analysis_lock.release()

@@ -33,7 +33,8 @@ public DbSet<CustomerOrderLine> CustomerOrderLines =>
 
         public DbSet<SmartBasketWorkflow> SmartBasketWorkflows =>
         Set<SmartBasketWorkflow>();
-
+public DbSet<FarmAiAnalysis> FarmAiAnalyses =>
+    Set<FarmAiAnalysis>();
     public DbSet<SmartBasketItem> SmartBasketItems =>
         Set<SmartBasketItem>();
 
@@ -50,6 +51,55 @@ public DbSet<CustomerPayment> CustomerPayments =>
     Set<CustomerPayment>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<FarmAiAnalysis>(entity =>
+{
+    entity.HasKey(x => x.Id);
+
+    entity.HasIndex(x => new
+    {
+        x.FarmerId,
+        x.RequestId
+    })
+    .IsUnique()
+    .HasDatabaseName("UX_FarmAiAnalysis_Request");
+
+    entity.HasIndex(x => new
+    {
+        x.FarmerId,
+        x.CreatedAt
+    });
+
+    entity.Property(x => x.FarmName)
+        .HasMaxLength(200);
+
+    entity.Property(x => x.Objective)
+        .HasMaxLength(500);
+
+    entity.Property(x => x.Status)
+        .HasMaxLength(32);
+
+    entity.Property(x => x.ErrorCode)
+        .HasMaxLength(80);
+
+    entity.Property(x => x.RequestJson)
+        .HasColumnType("jsonb");
+
+    entity.Property(x => x.InputJson)
+        .HasColumnType("jsonb");
+
+    entity.Property(x => x.ResultJson)
+        .HasColumnType("jsonb");
+
+    entity.HasOne<User>()
+        .WithMany()
+        .HasForeignKey(x => x.FarmerId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasOne<Farm>()
+        .WithMany()
+        .HasForeignKey(x => x.FarmId)
+        .OnDelete(DeleteBehavior.SetNull);
+});
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<FarmerNotification>(entity =>
         {

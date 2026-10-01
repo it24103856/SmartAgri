@@ -12,6 +12,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.DataProtection;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using SmartAgri.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -219,6 +220,25 @@ if (builder.Configuration.GetValue<bool>("SmartBasket:WorkerEnabled"))
     builder.Services.AddHostedService<SmartBasketWorker>();
     
 }
+builder.Services.AddScoped<FarmAnalysisService>();
+
+builder.Services.AddHttpClient<FarmAiClient>(
+    (services, client) =>
+    {
+        var configuration = services
+            .GetRequiredService<IConfiguration>();
+
+        var baseUrl =
+            configuration["AgentService:BaseUrl"]
+            ?? "http://127.0.0.1:8001/";
+
+        client.BaseAddress = new Uri(
+            baseUrl.TrimEnd('/') + "/");
+
+        client.Timeout = TimeSpan.FromSeconds(260);
+
+        client.MaxResponseContentBufferSize = 1_048_576;
+    });
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment() &&
