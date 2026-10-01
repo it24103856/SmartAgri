@@ -283,3 +283,7 @@
     height: 96px;
   }
 }
+.status-archived {
+  background: #eef1f4;
+  color: #526170;
+}

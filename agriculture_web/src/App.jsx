@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import Sidebar from './components/layout/Sidebar';
-import Dashboard from './pages/Dashboard/Dashboard';
 import Login from './pages/Auth/Login';
-import UserManagement from './pages/Users/UserManagement';
-import CategoryManagement from './pages/Categories/CategoryManagement';
-import ProductManagement from './pages/Products/ProductManagement';
-import OrderManagement from './pages/Orders/OrderManagement';
-import SmartBasketManagement from './pages/SmartBaskets/SmartBasketManagement';
-import PackageManagement from './pages/Packages/PackageManagement';
+
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
+const UserManagement = lazy(() => import('./pages/Users/UserManagement'));
+const CategoryManagement = lazy(() => import('./pages/Categories/CategoryManagement'));
+const ProductManagement = lazy(() => import('./pages/Products/ProductManagement'));
+const OrderManagement = lazy(() => import('./pages/Orders/OrderManagement'));
+const SmartBasketManagement = lazy(() => import('./pages/SmartBaskets/SmartBasketManagement'));
+const PackageManagement = lazy(() => import('./pages/Packages/PackageManagement'));
+const SalesAndProfit = lazy(() => import('./pages/Analytics/SalesAndProfit'));
 
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('token');
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const handleLogin = () => {
@@ -19,6 +23,8 @@ function App() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setIsAuthenticated(false);
   };
 
@@ -35,6 +41,7 @@ function App() {
       />
       
       <main className="min-w-0 flex-1 bg-[#F4F7F4] p-8 overflow-y-auto">
+        <Suspense fallback={<div role="status" className="p-4 text-gray-500">Loading page...</div>}>
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'categories' && <CategoryManagement />}
@@ -42,6 +49,7 @@ function App() {
         {activeTab === 'orders' && <OrderManagement />}
         {activeTab === 'ai-manage' && <SmartBasketManagement />}
         {activeTab === 'equipment' && <PackageManagement />}
+        {activeTab === 'analytics' && <SalesAndProfit />}
 
         {![
           'dashboard',
@@ -51,12 +59,14 @@ function App() {
           'orders',
           'ai-manage',
           'equipment',
+          'analytics',
         ].includes(activeTab) && (
           <div className="p-4">
             <h1 className="text-2xl font-bold text-[#1E3A2B] capitalize">{activeTab} Section</h1>
             <p className="mt-2 text-gray-500">Module component under development...</p>
           </div>
         )}
+        </Suspense>
       </main>
     </div>
   );

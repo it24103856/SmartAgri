@@ -26,6 +26,7 @@ builder.Services.AddSingleton<CategoryImageStore>();
 builder.Services.AddSingleton<ProfileImageStore>();
 builder.Services.AddScoped<IFarmService, FarmService>();
 builder.Services.AddScoped<IPackageService, PackageService>();
+builder.Services.AddScoped<PackagePaymentService>();
 builder.Services.AddSingleton<FarmImageStore>();
 builder.Services.AddSingleton<PackageImageStore>();
 
@@ -216,6 +217,7 @@ builder.Services.AddScoped<SmartBasketProcessor>();
 if (builder.Configuration.GetValue<bool>("SmartBasket:WorkerEnabled"))
 {
     builder.Services.AddHostedService<SmartBasketWorker>();
+    
 }
 
 var app = builder.Build();

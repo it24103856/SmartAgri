@@ -290,6 +290,19 @@ public partial class ProductService : IProductService{
         product.UpdatedAt = DateTime.UtcNow;
         product.Version = Guid.NewGuid();
 
+        if (product.CreatedByRole == "FARMER")
+        {
+            _db.FarmerNotifications.Add(new FarmerNotification
+            {
+                FarmerId = product.CreatedById!.Value,
+                ProductId = product.Id,
+                Title = approve ? "Product approved" : "Product rejected",
+                Message = approve
+                    ? $"{product.Name} has been approved."
+                    : $"{product.Name} was rejected: {reason}"
+            });
+        }
+
         await _db.SaveChangesAsync();
 
         return Map(product);
@@ -328,6 +341,7 @@ public partial class ProductService : IProductService{
 
             ImageUrls = CurrentImages(product),
             Status = product.Status,
+            IsActive = product.IsActive,
 
             CreatedById = product.CreatedById,
             CreatedByName = product.CreatedBy?.FullName ?? "Existing catalog",

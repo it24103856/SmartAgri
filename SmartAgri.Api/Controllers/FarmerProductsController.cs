@@ -73,6 +73,24 @@ public sealed class FarmerProductsController : ControllerBase
         });
     }
 
+    [HttpPost("{id:int}/archive")]
+public Task<IActionResult> Archive(
+    int id,
+    [FromBody] ArchiveFarmerProductDto dto)
+{
+    return Execute(async () =>
+        Ok(await _products.ArchiveFarmerProductAsync(
+            FarmerId, id, dto)));
+}
+
+    [HttpPut("{id:int}/availability")]
+    public Task<IActionResult> SetAvailability(
+        int id, [FromBody] SetFarmerProductAvailabilityDto dto)
+    {
+        return Execute(async () => Ok(
+            await _products.SetFarmerProductAvailabilityAsync(FarmerId, id, dto)));
+    }
+
     [HttpPut("{id:int}")]
     [Consumes("multipart/form-data")]
     public Task<IActionResult> Update(

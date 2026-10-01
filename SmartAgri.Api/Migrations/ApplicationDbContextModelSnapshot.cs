@@ -402,6 +402,105 @@ namespace SmartAgri.Api.Migrations
                     b.ToTable("Farms", (string)null);
                 });
 
+            modelBuilder.Entity("SmartAgri.Api.Models.FarmerNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FarmerId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FarmerId", "CreatedAt");
+
+                    b.ToTable("FarmerNotifications");
+                });
+
+            modelBuilder.Entity("SmartAgri.Api.Models.OrderPaymentProof", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("Receipt")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ReviewedById")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TransferReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('SUBMITTED', 'APPROVED')");
+
+                    b.HasIndex("ReviewedById");
+
+                    b.ToTable("OrderPaymentProofs");
+                });
+
             modelBuilder.Entity("SmartAgri.Api.Models.Package", b =>
                 {
                     b.Property<int>("Id")
@@ -494,6 +593,14 @@ namespace SmartAgri.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<decimal>("AdvanceAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<decimal>("CalculatedQuantity")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -532,6 +639,14 @@ namespace SmartAgri.Api.Migrations
                     b.Property<int>("PackageId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("RequiresAdvancePayment")
+                        .HasColumnType("boolean");
+
                     b.Property<DateOnly?>("ServiceDate")
                         .HasColumnType("date");
 
@@ -566,6 +681,69 @@ namespace SmartAgri.Api.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("PackageBookings", (string)null);
+                });
+
+            modelBuilder.Entity("SmartAgri.Api.Models.PackagePaymentProof", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReceiptFileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ReviewedById")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TransferReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewedById");
+
+                    b.HasIndex("BookingId", "Stage")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('SUBMITTED', 'APPROVED')");
+
+                    b.ToTable("PackagePaymentProofs", (string)null);
                 });
 
             modelBuilder.Entity("SmartAgri.Api.Models.Product", b =>
@@ -603,6 +781,11 @@ namespace SmartAgri.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text[]")
                         .HasDefaultValueSql("ARRAY[]::text[]");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IsFood")
                         .HasColumnType("boolean");
@@ -1084,6 +1267,31 @@ namespace SmartAgri.Api.Migrations
                     b.Navigation("Farmer");
                 });
 
+            modelBuilder.Entity("SmartAgri.Api.Models.FarmerNotification", b =>
+                {
+                    b.HasOne("SmartAgri.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("FarmerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SmartAgri.Api.Models.OrderPaymentProof", b =>
+                {
+                    b.HasOne("SmartAgri.Api.Models.CustomerOrder", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartAgri.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("SmartAgri.Api.Models.Package", b =>
                 {
                     b.HasOne("SmartAgri.Api.Models.User", "CreatedBy")
@@ -1119,6 +1327,24 @@ namespace SmartAgri.Api.Migrations
                     b.Navigation("Farmer");
 
                     b.Navigation("Package");
+                });
+
+            modelBuilder.Entity("SmartAgri.Api.Models.PackagePaymentProof", b =>
+                {
+                    b.HasOne("SmartAgri.Api.Models.PackageBooking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartAgri.Api.Models.User", "ReviewedBy")
+                        .WithMany()
+                        .HasForeignKey("ReviewedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("ReviewedBy");
                 });
 
             modelBuilder.Entity("SmartAgri.Api.Models.Product", b =>

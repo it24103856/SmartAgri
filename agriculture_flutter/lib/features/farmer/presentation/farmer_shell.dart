@@ -19,16 +19,29 @@ class FarmerShell extends StatefulWidget {
 
 class _FarmerShellState extends State<FarmerShell> {
   int _selectedIndex = 0;
+  late String _fullName;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullName = widget.fullName;
+  }
 
   Widget _page() => switch (_selectedIndex) {
-    0 => FarmerDashboardScreen(
-      fullName: widget.fullName,
-      onOpenTab: _selectTab,
-    ),
+    0 => FarmerDashboardScreen(fullName: _fullName, onOpenTab: _selectTab),
     1 => const MyFarmsScreen(),
     2 => const PackagesScreen(),
     3 => const MyProductsScreen(),
-    _ => FarmerProfileScreen(fullName: widget.fullName),
+    _ => FarmerProfileScreen(
+      fullName: _fullName,
+      onUpdated: (user) {
+        if (!mounted || _fullName == user.fullName) return;
+
+        setState(() {
+          _fullName = user.fullName;
+        });
+      },
+    ),
   };
 
   void _selectTab(int index) {

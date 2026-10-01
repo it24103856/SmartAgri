@@ -42,7 +42,7 @@ public sealed class CatalogController : ControllerBase
     {
         return _db.Products
             .AsNoTracking()
-            .Where(p => p.Status == "APPROVED");
+            .Where(p => (p.IsActive && p.Status == "APPROVED"));
     }
 
     private static IQueryable<CatalogProductDto> Project(
@@ -87,7 +87,7 @@ public sealed class CatalogController : ControllerBase
                 c.Name,
 
                 ProductCount = c.Products.Count(
-                    p => p.Status == "APPROVED"),
+                    p => (p.IsActive && p.Status == "APPROVED")),
 
                 c.ImageUrl
             })

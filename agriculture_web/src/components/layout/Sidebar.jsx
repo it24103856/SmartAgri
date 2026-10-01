@@ -14,7 +14,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     { id: 'equipment', label: 'Equipment & Packages', icon: Tractor },
     { id: 'ai-manage', label: 'Smart Basket Approvals', icon: Bot },
     { id: 'analytics', label: 'Sales & Profit', icon: TrendingUp },
-    { id: 'settings', label: 'System Settings', icon: Settings },
+   
   ];
 
   return (

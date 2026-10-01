@@ -27,8 +27,8 @@ public DateOnly? ServiceDate { get; set; }
     public decimal CalculatedQuantity { get; set; }
     public decimal TotalPrice { get; set; }
 
-    public string Status { get; set; } = "PENDING";
-    // PENDING | CONFIRMED | REJECTED | CANCELLED | COMPLETED    
+public string Status { get; set; } = "PENDING";
+// PENDING | CONFIRMED | REJECTED | CANCELLED | COMPLETED    
     public string? Notes { get; set; }
     public string? AdminNote { get; set; }
 
@@ -36,4 +36,13 @@ public DateOnly? ServiceDate { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
     public Guid Version { get; set; } = Guid.NewGuid();
+
+
+    public bool RequiresAdvancePayment { get; set; }
+
+public decimal AdvanceAmount { get; set; }
+
+public decimal AmountPaid { get; set; }
+
+public string PaymentStatus { get; set; } = "NOT_REQUIRED";
 }

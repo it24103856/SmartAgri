@@ -146,7 +146,7 @@ public sealed class SmartBasketDiagnosticsController : ControllerBase
                 unit_price_minor = ToMinor(product.Price),
                 stock_quantity = product.StockQuantity,
                 is_food = product.IsFood,
-                approved = product.Status == "APPROVED"
+                approved = (product.IsActive && product.Status == "APPROVED")
             }).ToArray(),
 
             excluded_product_ids = request.ExcludedProductIds,

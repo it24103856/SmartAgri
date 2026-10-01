@@ -4,6 +4,7 @@ import '../../../shared/widgets/order_status_emblem.dart';
 import '../../../payments/presentation/payment_result_screen.dart';
 import '../data/purchase_service.dart';
 import 'dart:async';
+import '../../farmer/presentation/widgets/booking_payment_panel.dart';
 
 class PurchaseOrderScreen extends StatefulWidget {
   final int orderId;
@@ -477,7 +478,9 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen>
                             ? tracking.history[i]['cancellationReason']
                                   as String?
                             : tracking.history[i]['paymentCollected'] == true
-                            ? 'Cash payment received'
+                            ? tracking.order.paymentMethod == 'BANK_TRANSFER'
+                                  ? 'Bank transfer verified'
+                                  : 'Cash payment received'
                             : null,
                       ),
 
@@ -502,6 +505,17 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen>
                     Text(tracking.order.city),
                   ]),
 
+                  if (tracking.order.paymentMethod == 'BANK_TRANSFER')
+                    BookingPaymentPanel(
+                      key: ValueKey(
+                        '${tracking.order.id}:${tracking.order.paymentStatus}',
+                      ),
+                      bookingId: tracking.order.id,
+                      isOrder: true,
+                      refreshRevision:
+                          _lastUpdated?.microsecondsSinceEpoch ?? 0,
+                      onChanged: _reload,
+                    ),
                   _section('Your items', [
                     for (final item in tracking.order.items)
                       Padding(
@@ -580,6 +594,8 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen>
                     Text(
                       tracking.order.paymentMethod == 'COD'
                           ? 'Cash on Delivery'
+                          : tracking.order.paymentMethod == 'BANK_TRANSFER'
+                          ? 'Bank transfer'
                           : 'PayHere Sandbox',
                     ),
                     Text('Status: ${tracking.order.paymentStatus}'),
@@ -618,7 +634,9 @@ class _PurchaseOrderScreenState extends State<PurchaseOrderScreen>
 }
 
 class PurchaseHistoryScreen extends StatefulWidget {
-  const PurchaseHistoryScreen({super.key});
+  final String title;
+
+  const PurchaseHistoryScreen({super.key, this.title = 'My Orders'});
 
   @override
   State<PurchaseHistoryScreen> createState() => _PurchaseHistoryScreenState();
@@ -647,7 +665,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Orders'),
+        title: Text(widget.title),
         actions: [
           IconButton(onPressed: _reload, icon: const Icon(Icons.refresh)),
         ],
@@ -687,7 +705,8 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     leading: const Icon(Icons.receipt_long_outlined),
                     title: Text('Order #${order.id}'),
                     subtitle: Text(
-                      '${order.status} · ${order.paymentStatus}\n'
+                      '${order.items.map((item) => '${item['name']} × ${item['quantity']}').join(', ')}\n'
+                      '${_PurchaseOrderScreenState._labels[order.status] ?? order.status} · ${order.paymentStatus}\n'
                       'Rs. ${order.total.toStringAsFixed(2)}',
                     ),
                     isThreeLine: true,

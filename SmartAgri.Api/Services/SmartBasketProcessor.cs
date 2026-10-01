@@ -126,7 +126,7 @@ public sealed class SmartBasketProcessor
     .Where(product =>
         (categoryId == null || product.CategoryId == categoryId) &&
         product.IsFood &&
-        product.Status == "APPROVED" &&
+        (product.IsActive && product.Status == "APPROVED") &&
         product.StockQuantity > 0 &&
         product.Price > 0 &&
         !excludedIds.Contains(product.Id))
@@ -157,7 +157,7 @@ public sealed class SmartBasketProcessor
     unit_price_minor = ToMinor(product.Price),
     stock_quantity = product.StockQuantity,
     is_food = product.IsFood,
-    approved = product.Status == "APPROVED"
+    approved = (product.IsActive && product.Status == "APPROVED")
 }).ToArray()
             };
 
@@ -294,7 +294,7 @@ public sealed class SmartBasketProcessor
     (categoryId.HasValue &&
      product.CategoryId != categoryId.Value) ||
     !product.IsFood ||
-    product.Status != "APPROVED" ||
+    (!product.IsActive || product.Status != "APPROVED") ||
     quantity < 1 ||
     quantity > 100000 ||
     quantity > product.StockQuantity)

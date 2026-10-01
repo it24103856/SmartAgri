@@ -6,6 +6,28 @@ namespace SmartAgri.Api.Services;
 
 public partial class ProductService
 {
+    public async Task<ProductResponseDto> SetFarmerProductAvailabilityAsync(
+        int farmerId, int id, SetFarmerProductAvailabilityDto dto)
+    {
+        await RequireFarmerAsync(farmerId);
+        var product = await FindFarmerProductAsync(farmerId, id);
+        CheckVersion(product, dto.Version);
+        if (dto.IsActive is null)
+            throw new ProductOperationException(400, "Choose active or inactive.");
+        if (product.Status == "ARCHIVED")
+            throw new ProductOperationException(409, "Edit and resubmit archived products first.");
+
+        // Availability never changes the admin's review decision.
+        if (product.IsActive != dto.IsActive.Value)
+        {
+            product.IsActive = dto.IsActive.Value;
+            product.UpdatedAt = DateTime.UtcNow;
+            product.Version = Guid.NewGuid();
+            await _db.SaveChangesAsync();
+        }
+        return Map(product);
+    }
+
     private async Task<User> RequireFarmerAsync(int farmerId)
     {
         var user = await _db.Users.FindAsync(farmerId);
@@ -151,7 +173,7 @@ public partial class ProductService
         CheckVersion(product, dto.Version);
 
         if (product.Status is not
-            ("PENDING" or "APPROVED" or "REJECTED"))
+            ("PENDING" or "APPROVED" or "REJECTED" or "ARCHIVED"))
         {
             throw new ProductOperationException(
                 409, "This product cannot be edited in its current state.");
@@ -211,4 +233,39 @@ public partial class ProductService
 
         return Map(product);
     }
+
+    public async Task<ProductResponseDto> ArchiveFarmerProductAsync(
+    int farmerId,
+    int id,
+    ArchiveFarmerProductDto dto)
+{
+    await RequireFarmerAsync(farmerId);
+
+    var product = await FindFarmerProductAsync(farmerId, id);
+
+    CheckVersion(product, dto.Version);
+
+    if (product.Status == "ARCHIVED")
+    {
+        return Map(product);
+    }
+
+    if (product.Status is not
+        ("PENDING" or "APPROVED" or "REJECTED"))
+    {
+        throw new ProductOperationException(
+            409,
+            "This product cannot be archived in its current state.");
+    }
+
+    product.Status = "ARCHIVED";
+    product.UpdatedAt = DateTime.UtcNow;
+    product.Version = Guid.NewGuid();
+
+    // Keep the product, images and existing order references.
+    await _db.SaveChangesAsync();
+
+    return Map(product);
 }
+}
+

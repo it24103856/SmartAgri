@@ -14,7 +14,8 @@ class FarmerProduct {
 
   final List<String> images;
 
-  final String status; // PENDING | APPROVED | REJECTED
+  final String status; // PENDING | APPROVED | REJECTED | ARCHIVED
+  final bool isActive;
   final String? rejectionReason;
   final String? reviewedByName;
 
@@ -42,6 +43,7 @@ class FarmerProduct {
     required this.stockQuantity,
     required this.images,
     required this.status,
+    this.isActive = true,
     this.rejectionReason,
     this.reviewedByName,
     this.isFood = false,
@@ -81,6 +83,7 @@ class FarmerProduct {
       stockQuantity: (json['stockQuantity'] as num).toInt(),
       images: images,
       status: (json['status'] as String).toUpperCase(),
+      isActive: json['isActive'] as bool? ?? true,
       rejectionReason: json['rejectionReason'] as String?,
       reviewedByName: json['reviewedByName'] as String?,
       isFood: json['isFood'] == true,
@@ -106,6 +109,16 @@ class FarmerProduct {
   bool get isPending => status == 'PENDING';
   bool get isApproved => status == 'APPROVED';
   bool get isRejected => status == 'REJECTED';
+  static const int lowStockThreshold = 5;
+
+  bool get isArchived => status == 'ARCHIVED';
+
+  bool get isOutOfStock => !isArchived && stockQuantity == 0;
+
+  bool get isLowStock =>
+      !isArchived && stockQuantity > 0 && stockQuantity <= lowStockThreshold;
+
+  bool get needsRestock => isOutOfStock || isLowStock;
 }
 
 class FarmerProductPage {

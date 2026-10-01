@@ -22,6 +22,7 @@ import api from '../../services/api';
 import '../Categories/CategoryManagement.css';
 import '../Products/ProductManagement.css';
 import './PackageManagement.css';
+import PackagePaymentReview from './PackagePaymentReview';
 
 const CATEGORIES = [
   { value: 'MACHINERY', label: 'Machinery & Land Prep', icon: Tractor, unit: 'acre' },
@@ -558,7 +559,7 @@ export default function PackageManagement() {
       );
 
       const messages = {
-        approve: 'Booking confirmed.',
+        approve: 'Booking approved. Advance payment is required for new bookings.',
         reject: 'Booking rejected.',
         complete: 'Booking completed.',
       };
@@ -634,6 +635,9 @@ export default function PackageManagement() {
 
       <Notice text={notice} />
       {error && <Notice text={error} error />}
+      {view === 'bookings' && (
+        <PackagePaymentReview onReviewed={() => load('bookings')} />
+      )}
 
       {view === 'packages' ? (
         <section className="cat-card">
@@ -840,7 +844,22 @@ export default function PackageManagement() {
               </td>
 
               <td>{money(booking.totalPrice)}</td>
-              <td>{booking.status}</td>
+              <td>
+                <div>
+                  {booking.status === 'AWAITING_PAYMENT'
+                    ? 'Awaiting advance payment'
+                    : booking.status}
+                </div>
+                {booking.requiresAdvancePayment && (
+                  <>
+                    <small>{booking.paymentStatus}</small>
+                    <div>Paid: {money(booking.amountPaid)}</div>
+                    <div>
+                      Outstanding: {money(booking.totalPrice - booking.amountPaid)}
+                    </div>
+                  </>
+                )}
+              </td>
 
               <td>
                 <div className="cat-row-actions">

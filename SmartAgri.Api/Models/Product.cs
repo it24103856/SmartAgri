@@ -21,6 +21,7 @@ public class Product
     public List<string> ImageUrls { get; set; } = new();
 
     public string Status { get; set; } = "PENDING";
+    public bool IsActive { get; set; } = true;
 
     // Nullable to support products that existed before this feature.
     public int? CreatedById { get; set; }

@@ -228,7 +228,7 @@ public sealed class AdminOrderService
 
             var payment = order.Payment;
 
-            if (payment.Method == "PAYHERE")
+            if (payment.Method is "PAYHERE" or "BANK_TRANSFER")
             {
                 if (payment.Status != "Paid")
                 {

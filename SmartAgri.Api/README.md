@@ -2,6 +2,30 @@
 
 This project contains the backend API structure for the SmartAgri platform.
 
+## Farmer product purchases
+
+Farmers use the same cart, checkout, order history and tracking endpoints as
+customers. In the Flutter app, open Marketplace, choose a product, and use
+Buy Now or Add to Cart. The farmer dashboard and marketplace link to My
+Purchases, which lists the signed-in buyer's latest 50 orders and their items.
+
+Farmer checkout supports cash on delivery, PayHere, and bank transfer. Bank
+transfer orders wait for receipt verification in the admin Orders page. A
+rejected receipt can be resubmitted. Approval marks payment as paid and deducts
+stock once; if stock is no longer available, the order enters PaymentReview
+for admin resolution. Order tracking refreshes the receipt status as well.
+
+Apply migrations through `20260930193323_AddOrderPaymentProofs`. Configure
+`OrderBankTransfer:BankName`, `AccountName`, `AccountNumber`, and `Branch` in
+local configuration or environment variables. Missing order bank values fall
+back to the corresponding `PackageBankTransfer` settings. Bank checkout is
+unavailable until the required bank details are configured.
+
+`SmartAgri.Api.Tests/FarmerPurchaseTests.cs` checks ownership, bank receipt
+review, stock and purchase history using an isolated temporary database;
+set `SMARTAGRI_TEST_CONNECTION` to a local PostgreSQL server connection before
+running it. Flutter regression coverage is in `test/farmer_purchase_test.dart`.
+
 ## Structure
 
 - Controllers

@@ -218,16 +218,20 @@ void main() {
         ),
         isTrue,
       );
-      expect(requests.any((r) => r.path == '/farmer-products'), isFalse);
+      expect(requests.any((r) => r.path == '/farmer-products'), isTrue);
+      expect(find.text('Your farm at a glance'), findsOneWidget);
+      expect(find.text('Approved products'), findsOneWidget);
       expect(
         requests.any((r) => r.path == '/farmer-packages/bookings'),
-        isFalse,
+        isTrue,
       );
       await tester.scrollUntilVisible(
         find.text('Harvest transport'),
         160,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(find.text('Harvest transport'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Harvest transport'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(TextField, 'Distance (km)'), findsOneWidget);

@@ -34,7 +34,7 @@ public Guid? SmartBasketVersion { get; set; }
     [Required, StringLength(100)]
     public string City { get; set; } = "";
 
-    [Required, RegularExpression("^(COD|PAYHERE)$")]
+    [Required, RegularExpression("^(COD|PAYHERE|BANK_TRANSFER)$")]
     public string PaymentMethod { get; set; } = "COD";
 
     [Required, MinLength(1), MaxLength(100)]

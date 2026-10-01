@@ -443,7 +443,11 @@ class _FarmerProductFormScreenState extends State<FarmerProductFormScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : Text(_isEdit ? 'Save changes' : 'Submit for review'),
+                      : Text(
+                          _isEdit
+                              ? 'Save & submit for review'
+                              : 'Submit for review',
+                        ),
                 ),
               ],
             ),

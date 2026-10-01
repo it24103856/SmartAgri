@@ -153,7 +153,11 @@ public record BookingResponseDto(
     int? FarmId = null,
     string? FarmName = null,
     string? FarmLocation = null,
-    DateOnly? ServiceDate = null
+   DateOnly? ServiceDate = null,
+bool RequiresAdvancePayment = false,
+decimal AdvanceAmount = 0,
+decimal AmountPaid = 0,
+string PaymentStatus = "NOT_REQUIRED"
 );
 
 public class ReviewBookingDto

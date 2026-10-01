@@ -12,7 +12,7 @@ namespace SmartAgri.Api.Controllers;
 
 [ApiController]
 [Route("api/cart")]
-[Authorize(Roles = "CUSTOMER")]
+[Authorize(Roles = "CUSTOMER,FARMER")]
 [ResponseCache(
     NoStore = true,
     Location = ResponseCacheLocation.None)]
@@ -37,7 +37,7 @@ public sealed class CartController : ControllerBase
 
         var allowed = await _db.Users.AnyAsync(
             u => u.Id == id
-                 && u.Role == "CUSTOMER"
+                 && (u.Role == "CUSTOMER" || u.Role == "FARMER")
                  && u.Status == "ACTIVE",
             ct);
 
@@ -71,7 +71,7 @@ public sealed class CartController : ControllerBase
                 UnitPrice = product.Price,
                 StockQuantity = product.StockQuantity,
 
-                Available = product.Status == "APPROVED"
+                Available = (product.IsActive && product.Status == "APPROVED")
                     && item.Quantity <= product.StockQuantity
             }
         ).ToListAsync(ct);
@@ -216,7 +216,7 @@ public sealed class CartController : ControllerBase
                     .AsNoTracking()
                     .SingleOrDefaultAsync(
                         p => p.Id == productId
-                             && p.Status == "APPROVED",
+                             && (p.IsActive && p.Status == "APPROVED"),
                         ct);
 
                 if (product is null)
@@ -338,7 +338,7 @@ public sealed class CartController : ControllerBase
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 p => p.Id == request.ProductId
-                     && p.Status == "APPROVED",
+                     && (p.IsActive && p.Status == "APPROVED"),
                 ct);
 
         if (product is null)

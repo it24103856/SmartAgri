@@ -124,6 +124,7 @@ class PackageBooking {
   final String? farmName;
   final String? farmLocation;
   final String? serviceDate;
+  final bool requiresAdvancePayment;
 
   const PackageBooking({
     required this.id,
@@ -144,6 +145,7 @@ class PackageBooking {
     this.farmName,
     this.farmLocation,
     this.serviceDate,
+    this.requiresAdvancePayment = false,
   });
 
   factory PackageBooking.fromJson(Map<String, dynamic> json) {
@@ -166,6 +168,7 @@ class PackageBooking {
       farmName: json['farmName'] as String?,
       farmLocation: json['farmLocation'] as String?,
       serviceDate: json['serviceDate'] as String?,
+      requiresAdvancePayment: json['requiresAdvancePayment'] == true,
     );
   }
 }

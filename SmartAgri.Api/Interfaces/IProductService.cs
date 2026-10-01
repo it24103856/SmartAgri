@@ -4,6 +4,8 @@ namespace SmartAgri.Api.Interfaces;
 
 public interface IProductService
 {
+    Task<ProductResponseDto> SetFarmerProductAvailabilityAsync(
+        int farmerId, int id, SetFarmerProductAvailabilityDto dto);
     Task<List<ProductResponseDto>> GetAllAsync(int adminId);
 
     Task<ProductResponseDto> GetByIdAsync(int adminId, int id);
@@ -32,6 +34,12 @@ Task<ProductResponseDto> GetFarmerProductAsync(
 Task<ProductResponseDto> CreateFarmerProductAsync(
     int farmerId, SaveProductDto dto);
 
+    Task<ProductResponseDto> ArchiveFarmerProductAsync(
+    int farmerId,
+    int id,
+    ArchiveFarmerProductDto dto);
+
 Task<ProductResponseDto> UpdateFarmerProductAsync(
     int farmerId, int id, UpdateProductDto dto);
 }
+

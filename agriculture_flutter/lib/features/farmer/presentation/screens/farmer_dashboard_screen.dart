@@ -6,10 +6,17 @@ import '../../../products/data/models/catalog_models.dart';
 import '../../../products/data/services/catalog_service.dart';
 import '../../data/models/package_models.dart';
 import '../../data/services/package_service.dart';
+import '../../data/services/farm_service.dart';
+import '../../data/services/farmer_profile_service.dart';
+import '../../../profile/presentation/widgets/profile_avatar.dart';
+import '../../data/services/farmer_product_service.dart';
 import '../widgets/farmer_glass.dart';
 import '../widgets/package_images.dart';
 import 'farmer_marketplace_screen.dart';
+import 'farmer_reports_screen.dart';
 import 'packages_screen.dart';
+import '../../../orders/presentation/purchase_order_screen.dart';
+import '../../../products/presentation/screens/product_details_screen.dart';
 
 class FarmerDashboardScreen extends StatefulWidget {
   final String fullName;
@@ -28,14 +35,57 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
   final _search = TextEditingController();
   late Future<List<Package>> _packages;
   late Future<CatalogData> _catalog;
+  late Future<List<int>> _summary;
+  late Future<String?> _profileImage;
+
+  Future<String?> _loadProfileImage() async {
+    try {
+      final user = await FarmerProfileService.instance.load();
+      return user.profileImageUrl;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<int>> _loadSummary() async {
+    final results = await Future.wait<List<int>>([
+      FarmService.instance.list().then((farms) => [farms.length]),
+      FarmerProductService.instance.listAll().then(
+        (products) => [
+          products.where((p) => p.isApproved).length,
+          products.where((p) => p.isPending).length,
+          products.where((p) => p.needsRestock).length,
+        ],
+      ),
+      PackageService.instance.myBookings().then(
+        (bookings) => [
+          bookings.where((b) => b.status == 'PENDING').length,
+          bookings.where((b) => b.status == 'CONFIRMED').length,
+        ],
+      ),
+    ]);
+    return results.expand((values) => values).toList();
+  }
 
   @override
   void initState() {
     super.initState();
     _load();
+    PackageService.instance.bookingChanges.addListener(_reloadSummary);
+  }
+
+  void _reloadSummary() {
+    if (!mounted) return;
+    setState(() {
+      _summary = _loadSummary();
+      _summary.ignore();
+    });
   }
 
   void _load() {
+    _profileImage = _loadProfileImage();
+    _summary = _loadSummary();
+    _summary.ignore();
     _packages = PackageService.instance.list();
     // Public marketplace: never use the signed-in farmer's inventory here.
     _catalog = CatalogService.instance.load(pageSize: 8, sort: 'latest');
@@ -44,8 +94,11 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
   }
 
   Future<void> _refresh() async {
+    if (!mounted) return;
     setState(_load);
     await Future.wait([
+      _profileImage.then<void>((_) {}),
+      _summary.then<void>((_) {}, onError: (Object _) {}),
       _packages.then<void>((_) {}, onError: (Object _) {}),
       _catalog.then<void>((_) {}, onError: (Object _) {}),
     ]);
@@ -53,6 +106,7 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
 
   @override
   void dispose() {
+    PackageService.instance.bookingChanges.removeListener(_reloadSummary);
     _search.dispose();
     super.dispose();
   }
@@ -102,6 +156,16 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
           ),
           actions: [
             IconButton(
+              tooltip: 'My purchases',
+              icon: const Icon(Icons.receipt_long_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const PurchaseHistoryScreen(title: 'My Purchases'),
+                ),
+              ),
+            ),
+            IconButton(
               tooltip: 'Refresh overview',
               onPressed: _refresh,
               icon: const Icon(Icons.refresh_rounded),
@@ -109,7 +173,11 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
             IconButton(
               tooltip: 'Your profile',
               onPressed: () => widget.onOpenTab(4),
-              icon: const Icon(Icons.account_circle_outlined, size: 29),
+              icon: FutureBuilder<String?>(
+                future: _profileImage,
+                builder: (context, snapshot) =>
+                    ProfileAvatar(imageUrl: snapshot.data, size: 36),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -123,6 +191,88 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
               Text(
                 'Hello, $firstName \u{1F44B}',
                 style: const TextStyle(fontSize: 15, color: Color(0xFF74765D)),
+              ),
+              const SizedBox(height: 16),
+              _summarySection(),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.notifications_outlined),
+                    label: const Text('Approval notifications'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            const FarmerReportsScreen(notifications: true),
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.bar_chart),
+                    label: const Text('My product sales'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const FarmerReportsScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Material(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const PurchaseHistoryScreen(title: 'My Purchases'),
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          color: Color(0xFFD9EBC8),
+                          size: 24,
+                        ),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'My Purchases',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Orders, payments & delivery updates',
+                                style: TextStyle(
+                                  color: Color(0xFFDCE9DF),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               FarmerGlassCard(
@@ -183,6 +333,189 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
       ),
     );
   }
+
+  Widget _summarySection() => FutureBuilder<List<int>>(
+    future: _summary,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
+      if (snapshot.hasError) {
+        return FarmerGlassCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const Text('Could not load your farm summary.'),
+                TextButton(
+                  onPressed: _reloadSummary,
+                  child: const Text('Retry summary'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      final counts = snapshot.requireData;
+      const labels = [
+        'My farms',
+        'Approved products',
+        'Pending products',
+        'Low / no stock',
+        'Pending bookings',
+        'Confirmed bookings',
+      ];
+      const tabs = [1, 3, 3, 3, 2, 2];
+      const icons = [
+        Icons.agriculture_outlined,
+        Icons.verified_outlined,
+        Icons.inventory_2_outlined,
+        Icons.inventory_outlined,
+        Icons.event_outlined,
+        Icons.event_available_outlined,
+      ];
+      const accents = [
+        AppColors.primary,
+        Color(0xFF367C65),
+        Color(0xFFA5782A),
+        Color(0xFFB16B46),
+        Color(0xFF847044),
+        Color(0xFF477C86),
+      ];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Your farm at a glance',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'A little overview of everything you grow.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
+              final columns = constraints.maxWidth < 280 || largeText
+                  ? 1
+                  : constraints.maxWidth >= 650
+                  ? 3
+                  : 2;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: List.generate(
+                  labels.length,
+                  (index) => SizedBox(
+                    width:
+                        (constraints.maxWidth - (columns - 1) * 12) / columns,
+                    child: Material(
+                      color: const Color(0xFFFFFEFA),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: const BorderSide(color: Color(0xFFE6E9DD)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => widget.onOpenTab(tabs[index]),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: accents[index].withValues(
+                                        alpha: 0.10,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      icons[index],
+                                      color: accents[index],
+                                      size: 19,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(
+                                    Icons.north_east_rounded,
+                                    size: 14,
+                                    color: accents[index].withValues(
+                                      alpha: 0.55,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${counts[index]}',
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  height: 1,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.8,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 7),
+                              Text(
+                                labels[index],
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Low / no stock: 5 units or fewer, excluding archived products.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.4,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    },
+  );
 
   Widget _heading(String title, VoidCallback onTap, String tooltip) => Row(
     children: [
@@ -544,6 +877,18 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(this.context).push(
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailsScreen(productId: product.id),
+                ),
+              );
+            },
+            child: const Text('View & buy'),
+          ),
         ],
       ),
     ),

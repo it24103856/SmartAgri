@@ -4,6 +4,9 @@ import '../../../../shared/widgets/catalog_common.dart';
 import '../../../products/data/models/catalog_models.dart';
 import '../../../products/data/services/catalog_service.dart';
 import '../widgets/farmer_ui.dart';
+import '../../../products/presentation/screens/product_details_screen.dart';
+import '../../../cart/presentation/cart_screen.dart';
+import '../../../orders/presentation/purchase_order_screen.dart';
 
 class FarmerMarketplaceScreen extends StatefulWidget {
   final String initialSearch;
@@ -42,6 +45,25 @@ class _FarmerMarketplaceScreenState extends State<FarmerMarketplaceScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Marketplace'),
+        actions: [
+          IconButton(
+            tooltip: 'My cart',
+            icon: const Icon(Icons.shopping_cart_outlined),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const CartScreen())),
+          ),
+          IconButton(
+            tooltip: 'My purchases',
+            icon: const Icon(Icons.receipt_long_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    const PurchaseHistoryScreen(title: 'My Purchases'),
+              ),
+            ),
+          ),
+        ],
         backgroundColor: AppColors.surface,
       ),
       body: RefreshIndicator(
@@ -207,6 +229,14 @@ class _ProductCard extends StatelessWidget {
                   color: product.inStock ? AppColors.primary : AppColors.error,
                   fontSize: 12,
                 ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailsScreen(productId: product.id),
+                  ),
+                ),
+                child: const Text('View & buy'),
               ),
             ],
           ),

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../../services/api';
+import PackagePaymentReview from '../Packages/PackagePaymentReview';
 
 const PAGE_SIZE = 10;
 
@@ -312,7 +313,7 @@ function OrderDetail({ id, onBack, onReload }) {
   const payment = order?.payment;
 
   const paymentReady =
-    payment?.method === 'PAYHERE'
+    ['PAYHERE', 'BANK_TRANSFER'].includes(payment?.method)
       ? payment.status === 'Paid'
       : payment?.method === 'COD'
         && ['Unpaid', 'Paid'].includes(payment.status);
@@ -437,6 +438,8 @@ function OrderDetail({ id, onBack, onReload }) {
               <p>
                 Method: {payment.method === 'COD'
                   ? 'Cash on Delivery'
+                  : payment.method === 'BANK_TRANSFER'
+                    ? 'Bank transfer'
                   : 'PayHere Sandbox'}
               </p>
               <p>Status: <strong>{payment.status}</strong></p>
@@ -626,6 +629,7 @@ export default function OrderManagement() {
       </header>
 
       <Notice>{notice}</Notice>
+      <PackagePaymentReview basePath="/order-payments" isOrder onReviewed={refresh} />
 
       {selectedId !== null ? (
         <OrderDetail

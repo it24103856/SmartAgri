@@ -355,7 +355,7 @@ public sealed class AdminSmartBasketService
         {
             if (!products.TryGetValue(item.ProductId, out var product) ||
                 !product.IsFood ||
-                product.Status != "APPROVED" ||
+                (!product.IsActive || product.Status != "APPROVED") ||
                 (categoryId.HasValue &&
                  product.CategoryId != categoryId.Value) ||
                 excludedIds.Contains(product.Id) ||

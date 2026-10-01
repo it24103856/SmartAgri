@@ -500,7 +500,7 @@ public sealed class SmartBasketService
                 allowedIds.Contains(product.Id) &&
                 !excludedIds.Contains(product.Id) &&
                 product.IsFood &&
-                product.Status == "APPROVED" &&
+                (product.IsActive && product.Status == "APPROVED") &&
                 product.StockQuantity > 0 &&
                 product.Price > 0 &&
                 (!categoryId.HasValue ||
@@ -649,7 +649,7 @@ public sealed class SmartBasketService
             !product.IsFood ||
             (categoryId.HasValue &&
              product.CategoryId != categoryId.Value) ||
-            product.Status != "APPROVED" ||
+            (!product.IsActive || product.Status != "APPROVED") ||
             excludedIds.Contains(product.Id) ||
             product.Price <= 0 ||
             product.StockQuantity < line.Quantity)

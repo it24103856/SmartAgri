@@ -115,7 +115,11 @@ public class PackageService : IPackageService
         b.FarmId,
         b.FarmName,
         b.FarmLocation,
-        b.ServiceDate
+        b.ServiceDate,
+        b.RequiresAdvancePayment,
+        b.AdvanceAmount,
+        b.AmountPaid,
+        b.PaymentStatus
     );
 
     private static void ApplyDetails(Package package, SavePackageDto dto)
@@ -378,21 +382,35 @@ public class PackageService : IPackageService
         return bookings.Select(MapBooking).ToList();
     }
 
-    public Task<BookingResponseDto> ReviewBookingAsync(
-        int adminId,
-        int bookingId,
-        ReviewBookingDto dto,
-        bool approve)
-    {
-        return TransitionBookingAsync(
-            adminId,
-            "ADMIN",
-            bookingId,
-            dto.Version,
-            "PENDING",
-            approve ? "CONFIRMED" : "REJECTED",
-            dto.AdminNote);
-    }
+    public async Task<BookingResponseDto> ReviewBookingAsync(
+    int adminId,
+    int bookingId,
+    ReviewBookingDto dto,
+    bool approve)
+{
+    await RequireRoleAsync(adminId, "ADMIN");
+
+    var booking = await _db.PackageBookings
+        .AsNoTracking()
+        .SingleOrDefaultAsync(b => b.Id == bookingId)
+        ?? throw new PackageOperationException(
+            404, "Booking not found.");
+
+    var nextStatus = !approve
+        ? "REJECTED"
+        : booking.RequiresAdvancePayment
+            ? "AWAITING_PAYMENT"
+            : "CONFIRMED";
+
+    return await TransitionBookingAsync(
+        adminId,
+        "ADMIN",
+        bookingId,
+        dto.Version,
+        "PENDING",
+        nextStatus,
+        dto.AdminNote);
+}
 
     public Task<BookingResponseDto> CancelBookingAsync(
         int farmerId,
@@ -477,12 +495,13 @@ public class PackageService : IPackageService
         }
 
         if (nextStatus == "COMPLETED" &&
-            booking.ServiceDate.HasValue &&
-            booking.ServiceDate.Value > TodayInSriLanka())
-        {
-            throw new PackageOperationException(
-                400, "A future service cannot be marked completed.");
-        }
+    booking.RequiresAdvancePayment &&
+    booking.PaymentStatus != "PARTIALLY_PAID")
+{
+    throw new PackageOperationException(
+        409,
+        "Verify the advance payment before completing this service.");
+}
 
         booking.Status = nextStatus;
 
@@ -590,8 +609,19 @@ public class PackageService : IPackageService
 
         var (quantity, _, total) = Calculate(package, dto);
 
+
+if (total < 0.02m)
+{
+    throw new PackageOperationException(
+        400, "The booking total is too small for two payments.");
+}
         var booking = new PackageBooking
         {
+            RequiresAdvancePayment = true,
+AdvanceAmount = decimal.Round(
+    total / 2m, 2, MidpointRounding.AwayFromZero),
+AmountPaid = 0m,
+PaymentStatus = "UNPAID",
             PackageId = package.Id,
             Package = package,
             FarmerId = farmer.Id,

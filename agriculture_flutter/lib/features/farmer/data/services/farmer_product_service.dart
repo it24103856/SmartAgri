@@ -214,6 +214,26 @@ class FarmerProductService {
     );
   }
 
+  Future<FarmerProduct> archive(FarmerProduct product) {
+    return _send(
+      () => _dio.post<dynamic>(
+        '/farmer-products/${product.id}/archive',
+        data: {'version': product.version},
+      ),
+      (data) => FarmerProduct.fromJson(Map<String, dynamic>.from(data as Map)),
+    );
+  }
+
+  Future<FarmerProduct> setAvailability(FarmerProduct product, bool isActive) {
+    return _send(
+      () => _dio.put<dynamic>(
+        '/farmer-products/${product.id}/availability',
+        data: {'version': product.version, 'isActive': isActive},
+      ),
+      (data) => FarmerProduct.fromJson(Map<String, dynamic>.from(data as Map)),
+    );
+  }
+
   Future<FarmerProduct> update({
     required int id,
     required String version,

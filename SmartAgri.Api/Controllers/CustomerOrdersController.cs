@@ -7,7 +7,7 @@ namespace SmartAgri.Api.Controllers;
 
 [ApiController]
 [Route("api/customer-orders")]
-[Authorize(Roles = "CUSTOMER")]
+[Authorize(Roles = "CUSTOMER,FARMER")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class CustomerOrdersController : ControllerBase
 {

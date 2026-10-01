@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/utils/token_storage.dart';
-import '../../../shared/widgets/catalog_common.dart';
 import '../../auth/data/models/user_model.dart';
 import '../../auth/data/services/profile_photo.dart';
 import '../data/customer_profile_service.dart';
 import 'widgets/profile_avatar.dart';
+import '../../auth/data/services/auth_service.dart';
+import '../../farmer/data/services/farmer_profile_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel user;
   final bool focusAddress;
+  final bool isFarmer;
 
   const EditProfileScreen({
     super.key,
     required this.user,
     this.focusAddress = false,
+    this.isFarmer = false,
   });
 
   @override
@@ -101,7 +104,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      final user = await CustomerProfileService.instance.save(
+      final saveProfile = widget.isFarmer
+          ? FarmerProfileService.instance.save
+          : CustomerProfileService.instance.save;
+
+      final user = await saveProfile(
         fullName: _name.text,
         phone: _phone.text,
         address: _address.text,
@@ -125,9 +132,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (error) {
       if (!mounted) return;
 
-      if (error is CustomerProfileException &&
-          (error.statusCode == 401 || error.statusCode == 403)) {
-        await signOutCustomer(context);
+      final statusCode = switch (error) {
+        CustomerProfileException e => e.statusCode,
+        FarmerProfileException e => e.statusCode,
+        _ => null,
+      };
+
+      if (statusCode == 401 || statusCode == 403) {
+        await AuthService.instance.logout();
         return;
       }
 
@@ -251,11 +263,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   keyboard: TextInputType.phone,
                 ),
 
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    'Delivery address',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                    widget.isFarmer ? 'Contact address' : 'Delivery address',
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/farmer_ui.dart';
 import '../widgets/farmer_glass.dart';
 import '../widgets/package_images.dart';
+import '../widgets/booking_payment_panel.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../data/models/package_models.dart';
@@ -930,7 +931,9 @@ class _BookingTileState extends State<_BookingTile> {
             ),
             const SizedBox(height: 6),
             Text(
-              booking.status,
+              booking.status == 'AWAITING_PAYMENT'
+                  ? 'Awaiting advance payment'
+                  : booking.status,
               style: TextStyle(color: color, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),
@@ -967,6 +970,12 @@ class _BookingTileState extends State<_BookingTile> {
                 label: Text(_busy ? 'Please wait...' : 'Cancel booking'),
               ),
             ],
+            if (booking.requiresAdvancePayment)
+              BookingPaymentPanel(
+                key: ValueKey(booking.id),
+                bookingId: booking.id,
+                onChanged: widget.onChanged,
+              ),
           ],
         ),
       ),

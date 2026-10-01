@@ -12,6 +12,8 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<User> Users { get; set; }
+    public DbSet<FarmerNotification> FarmerNotifications => Set<FarmerNotification>();
+    public DbSet<OrderPaymentProof> OrderPaymentProofs => Set<OrderPaymentProof>();
     public DbSet<Category> Categories { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<Cart> Carts { get; set; }
@@ -41,11 +43,22 @@ public DbSet<CustomerOrderLine> CustomerOrderLines =>
     public DbSet<SmartBasketApproval> SmartBasketApprovals =>
         Set<SmartBasketApproval>();
 
+        public DbSet<PackagePaymentProof> PackagePaymentProofs =>
+    Set<PackagePaymentProof>();
+
 public DbSet<CustomerPayment> CustomerPayments =>
     Set<CustomerPayment>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<FarmerNotification>(entity =>
+        {
+            entity.HasIndex(n => new { n.FarmerId, n.CreatedAt });
+            entity.Property(n => n.Title).HasMaxLength(200);
+            entity.Property(n => n.Message).HasMaxLength(2000);
+            entity.HasOne<User>().WithMany().HasForeignKey(n => n.FarmerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
                 modelBuilder.Entity<SmartBasketWorkflow>(entity =>
         {
             entity.ToTable("SmartBasketWorkflows", table =>
@@ -310,6 +323,7 @@ modelBuilder.Entity<CartItem>(entity =>
 
         modelBuilder.Entity<Product>(entity =>
         {
+            entity.Property(p => p.IsActive).HasDefaultValue(true);
             entity.Property(p => p.Name)
                 .HasMaxLength(150)
                 .IsRequired();
@@ -458,6 +472,9 @@ modelBuilder.Entity<CartItem>(entity =>
             entity.Property(b => b.LoadWeightKg).HasPrecision(12, 2);
             entity.Property(b => b.CalculatedQuantity).HasPrecision(12, 2);
             entity.Property(b => b.TotalPrice).HasPrecision(12, 2);
+            entity.Property(b => b.AdvanceAmount).HasPrecision(12, 2);
+            entity.Property(b => b.AmountPaid).HasPrecision(12, 2);
+            entity.Property(b => b.PaymentStatus).HasMaxLength(20).IsRequired();
 
             entity.Property(b => b.Status)
                 .IsRequired()
@@ -495,6 +512,42 @@ entity.HasOne(b => b.Farm)
     .OnDelete(DeleteBehavior.SetNull);
 
 entity.HasIndex(b => b.ServiceDate);
+        });
+        modelBuilder.Entity<OrderPaymentProof>(entity =>
+        {
+            entity.Property(p => p.Amount).HasPrecision(18, 2);
+            entity.Property(p => p.TransferReference).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.ContentType).HasMaxLength(30).IsRequired();
+            entity.Property(p => p.Status).HasMaxLength(20).IsRequired();
+            entity.Property(p => p.AdminNote).HasMaxLength(500);
+            entity.Property(p => p.Version).IsConcurrencyToken();
+            entity.HasOne(p => p.Order).WithMany().HasForeignKey(p => p.OrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(p => p.ReviewedById).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(p => p.OrderId).IsUnique().HasFilter("\"Status\" IN ('SUBMITTED', 'APPROVED')");
+        });
+        modelBuilder.Entity<PackagePaymentProof>(entity =>
+        {
+            entity.ToTable("PackagePaymentProofs");
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Stage).HasMaxLength(10).IsRequired();
+            entity.Property(p => p.Amount).HasPrecision(12, 2);
+            entity.Property(p => p.TransferReference).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.ReceiptFileName).HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Status).HasMaxLength(20).IsRequired();
+            entity.Property(p => p.AdminNote).HasMaxLength(500);
+            entity.Property(p => p.Version).IsConcurrencyToken();
+            entity.HasOne(p => p.Booking)
+                .WithMany()
+                .HasForeignKey(p => p.BookingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(p => p.ReviewedBy)
+                .WithMany()
+                .HasForeignKey(p => p.ReviewedById)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Rejected receipts remain in history.
+            entity.HasIndex(p => new { p.BookingId, p.Stage })
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('SUBMITTED', 'APPROVED')");
         });
     }
 }

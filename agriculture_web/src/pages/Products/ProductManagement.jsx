@@ -888,7 +888,7 @@ export default function ProductManagement() {
         </div>
 
         <div className="cat-filters" role="group" aria-label="Product status">
-          {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((value) => (
+          {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'ARCHIVED'].map((value) => (
             <button
               key={value}
               type="button"

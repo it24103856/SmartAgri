@@ -14,7 +14,7 @@ using SmartAgri.Api.Models;
 
 namespace SmartAgri.Api.Services;
 
-public sealed class CustomerCheckoutService
+public sealed partial class CustomerCheckoutService
 {
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
@@ -48,7 +48,7 @@ public sealed class CustomerCheckoutService
 
         var active = await _db.Users.AnyAsync(u =>
             u.Id == id &&
-            u.Role == "CUSTOMER" &&
+            (u.Role == "CUSTOMER" || u.Role == "FARMER") &&
             u.Status == "ACTIVE");
 
         if (!active)
@@ -157,7 +157,7 @@ public sealed class CustomerCheckoutService
                 request.Items.Select(line => line.ProductId).Distinct().Count()
                     != request.Items.Count ||
                 (request.PaymentMethod != "COD" &&
-                 request.PaymentMethod != "PAYHERE"))
+                 request.PaymentMethod != "PAYHERE" && request.PaymentMethod != "BANK_TRANSFER"))
             {
                 throw new BadHttpRequestException(
                     "Invalid checkout items or payment method.", 400);
@@ -165,7 +165,7 @@ public sealed class CustomerCheckoutService
 
             var activeCustomer = await _db.Users.AnyAsync(user =>
                 user.Id == userId &&
-                user.Role == "CUSTOMER" &&
+                (user.Role == "CUSTOMER" || user.Role == "FARMER") &&
                 user.Status == "ACTIVE");
 
             if (!activeCustomer)
@@ -196,6 +196,8 @@ public sealed class CustomerCheckoutService
 
             if (request.PaymentMethod == "PAYHERE")
                 PayHereSettings();
+            if (request.PaymentMethod == "BANK_TRANSFER" && !OrderBankConfigured())
+                throw new BadHttpRequestException("Bank details are not configured. Contact admin.", 503);
 
             var ids = request.Items
                 .Select(i => i.ProductId)
@@ -254,7 +256,7 @@ public sealed class CustomerCheckoutService
             foreach (var line in request.Items)
             {
                 if (!products.TryGetValue(line.ProductId, out var product) ||
-                    product.Status != "APPROVED" ||
+                    (!product.IsActive || product.Status != "APPROVED") ||
                     product.StockQuantity < line.Quantity ||
                     product.Price <= 0)
                 {
@@ -479,7 +481,7 @@ public sealed class CustomerCheckoutService
         {
             if (!products.TryGetValue(item.ProductId, out var product) ||
                 !product.IsFood ||
-                product.Status != "APPROVED" ||
+                (!product.IsActive || product.Status != "APPROVED") ||
                 (categoryId.HasValue &&
                  product.CategoryId != categoryId.Value) ||
                 excludedIds.Contains(product.Id) ||
@@ -519,7 +521,7 @@ public sealed class CustomerCheckoutService
         foreach (var line in order.Items)
         {
             if (!products.TryGetValue(line.ProductId, out var product) ||
-                product.Status != "APPROVED" ||
+                (!product.IsActive || product.Status != "APPROVED") ||
                 product.StockQuantity < line.Quantity)
             {
                 return false;

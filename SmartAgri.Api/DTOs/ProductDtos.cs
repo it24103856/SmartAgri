@@ -104,6 +104,7 @@ public class ReviewProductDto
 
 public class ProductResponseDto
 {
+    public bool IsActive { get; set; }
     public bool IsFood { get; set; }
     public string? NutritionFacts { get; set; }
     public string? NutritionBasis { get; set; }
@@ -139,4 +140,13 @@ public class ProductResponseDto
     public DateTime? ReviewedAt { get; set; }
 
     public Guid Version { get; set; }
+}
+
+public class SetFarmerProductAvailabilityDto
+{
+    [Required]
+    public Guid? Version { get; set; }
+
+    [Required]
+    public bool? IsActive { get; set; }
 }
