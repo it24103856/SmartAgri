@@ -18,20 +18,20 @@ class FarmFormScreen extends StatefulWidget {
 class _FarmFormScreenState extends State<FarmFormScreen> {
   static const _areaUnits = ['Acres', 'Perches', 'Hectares'];
   static const _soilTypes = [
-    'Loamy (ලෝම)',
-    'Clay (මැටි)',
-    'Sandy (වැලි)',
-    'Silt (මඩ/රොන්මඩ)',
-    'Peat (පීට්)',
-    'Other (වෙනත්)',
+    'Loamy',
+    'Clay',
+    'Sandy',
+    'Silt',
+    'Peat',
+    'Other',
   ];
   static const _irrigationTypes = [
-    'Rainfed (වැසි ජලය)',
-    'Drip Irrigation (බිංදු ජල සම්පාදනය)',
-    'Sprinkler (විදින ජල සම්පාදනය)',
-    'Canal / Surface (ඇළ මාර්ග)',
-    'Well / Groundwater (ළිං ජලය)',
-    'Other (වෙනත්)',
+    'Rainfed',
+    'Drip Irrigation',
+    'Sprinkler',
+    'Canal / Surface',
+    'Well / Groundwater',
+    'Other',
   ];
 
   final _form = GlobalKey<FormState>();
@@ -326,7 +326,7 @@ class _FarmFormScreenState extends State<FarmFormScreen> {
                   isExpanded: true,
                   initialValue: _soilType,
                   decoration: const InputDecoration(
-                    labelText: 'Soil Type (පස වර්ගය)',
+                    labelText: 'Soil Type',
                     prefixIcon: Icon(Icons.grass_outlined),
                   ),
                   items: [
@@ -347,7 +347,7 @@ class _FarmFormScreenState extends State<FarmFormScreen> {
                   isExpanded: true,
                   initialValue: _irrigationType,
                   decoration: const InputDecoration(
-                    labelText: 'Irrigation Type (ජල සම්පාදනය)',
+                    labelText: 'Irrigation Type',
                     prefixIcon: Icon(Icons.water_drop_outlined),
                   ),
                   items: [
@@ -368,7 +368,7 @@ class _FarmFormScreenState extends State<FarmFormScreen> {
                 TextFormField(
                   controller: _mainCrops,
                   decoration: const InputDecoration(
-                    labelText: 'Main Crops (ප්‍රධාන බෝග)',
+                    labelText: 'Main Crops',
                     hintText: 'e.g. Paddy, Coconut, Banana, Vegetables',
                     prefixIcon: Icon(Icons.eco_outlined),
                   ),
