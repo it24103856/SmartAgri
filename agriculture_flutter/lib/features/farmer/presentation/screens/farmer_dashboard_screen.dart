@@ -17,6 +17,7 @@ import 'farmer_reports_screen.dart';
 import 'packages_screen.dart';
 import '../../../orders/presentation/purchase_order_screen.dart';
 import '../../../products/presentation/screens/product_details_screen.dart';
+import 'farmer_ai_screen.dart';
 
 class FarmerDashboardScreen extends StatefulWidget {
   final String fullName;
@@ -156,14 +157,11 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
           ),
           actions: [
             IconButton(
-              tooltip: 'My purchases',
-              icon: const Icon(Icons.receipt_long_outlined),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const PurchaseHistoryScreen(title: 'My Purchases'),
-                ),
-              ),
+              tooltip: 'Farmer AI',
+              icon: const Icon(Icons.auto_awesome),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FarmerAiScreen())),
             ),
             IconButton(
               tooltip: 'Refresh overview',
