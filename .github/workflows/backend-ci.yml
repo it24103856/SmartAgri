@@ -1,0 +1,71 @@
+name: SmartAgri Backend CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: smartagri_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SMARTAGRI_TEST_DB_USER: postgres
+      SMARTAGRI_TEST_DB_PASSWORD: ci_test_password
+      SMARTAGRI_TEST_CONNECTION: "Host=localhost;Port=5432;Database=smartagri_ci;Username=postgres;Password=ci_test_password"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Display runtime information
+        run: dotnet --info
+
+      - name: Restore dependencies
+        run: dotnet restore SmartAgri.Api.Tests/SmartAgri.Api.Tests.csproj
+
+      - name: Build backend and tests
+        run: >
+          dotnet build SmartAgri.Api.Tests/SmartAgri.Api.Tests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Run backend tests
+        run: >
+          dotnet test SmartAgri.Api.Tests/SmartAgri.Api.Tests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=backend-tests.trx"
+          --results-directory TestResults
+
+      - name: Save test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults/
+          if-no-files-found: warn
