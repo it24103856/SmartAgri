@@ -116,16 +116,15 @@ public sealed class FarmerProfileController : ControllerBase
 
             await _db.SaveChangesAsync();
         }
-        catch
-        {
-            _images.DeleteFiles(newPhotos);
+        catch{
+        await _images.DeleteFilesAsync(newPhotos);
             throw;
         }
 
         if (newPhotos.Count > 0 &&
             !string.IsNullOrWhiteSpace(oldPhoto))
         {
-            _images.DeleteFiles(new[] { oldPhoto });
+           await _images.DeleteFilesAsync(new[] { oldPhoto });
         }
 
         return Ok(ToDto(farmer));

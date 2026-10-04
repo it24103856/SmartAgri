@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 
 namespace SmartAgri.Api.Services;
@@ -5,18 +8,25 @@ namespace SmartAgri.Api.Services;
 public class ProfileImageStore
 {
     private const long MaxFileSize = 5 * 1024 * 1024;
-    private const string UrlPrefix = "/uploads/profiles/";
+    private const string LocalUrlPrefix = "/uploads/profiles/";
 
     private readonly ILogger<ProfileImageStore> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _serviceRoleKey;
+    private readonly string _objectEndpoint;
+    private readonly string _publicUrlPrefix;
 
+    // Keep existing local profile photos accessible.
     public string RootDirectory { get; }
 
     public ProfileImageStore(
         IWebHostEnvironment environment,
         IConfiguration configuration,
-        ILogger<ProfileImageStore> logger)
+        ILogger<ProfileImageStore> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
 
         RootDirectory = Path.GetFullPath(
             configuration["ProfileImages:Directory"]
@@ -27,6 +37,36 @@ public class ProfileImageStore
                 "profiles"));
 
         Directory.CreateDirectory(RootDirectory);
+
+        var projectUrl = Required(configuration, "Supabase:Url")
+            .TrimEnd('/');
+
+        if (!Uri.TryCreate(projectUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || uri.AbsolutePath != "/"
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            throw new InvalidOperationException(
+                "Supabase:Url must be the HTTPS project URL.");
+        }
+
+        _serviceRoleKey = Required(
+            configuration,
+            "Supabase:ServiceRoleKey");
+
+        var bucket = Required(
+            configuration,
+            "Supabase:ProfileBucket");
+
+        var encodedBucket = Uri.EscapeDataString(bucket);
+
+        _objectEndpoint =
+            $"{projectUrl}/storage/v1/object/{encodedBucket}";
+
+        _publicUrlPrefix =
+            $"{projectUrl}/storage/v1/object/public/{encodedBucket}/";
     }
 
     public async Task<List<string>> SaveAsync(
@@ -39,6 +79,9 @@ public class ProfileImageStore
         }
 
         var savedUrls = new List<string>();
+
+        using var client =
+            _httpClientFactory.CreateClient("SupabaseStorage");
 
         try
         {
@@ -63,78 +106,228 @@ public class ProfileImageStore
                         "Only JPG, PNG and WebP images are supported.");
                 }
 
+                using var image = new MemoryStream();
+                await image.WriteAsync(header);
+
+                var buffer = new byte[81920];
+                int bytesRead;
+
+                while ((bytesRead = await input.ReadAsync(
+                    buffer.AsMemory())) > 0)
+                {
+                    if (image.Length + bytesRead > MaxFileSize)
+                    {
+                        throw new BadHttpRequestException(
+                            "Each image must be no larger than 5 MB.");
+                    }
+
+                    await image.WriteAsync(
+                        buffer.AsMemory(0, bytesRead));
+                }
+
+                image.Position = 0;
+
                 var fileName = $"{Guid.NewGuid():N}{extension}";
-                var url = UrlPrefix + fileName;
+                var publicUrl = _publicUrlPrefix + fileName;
 
-                // Register before writing so partial files can be cleaned up.
-                savedUrls.Add(url);
+                using var request = CreateRequest(
+                    HttpMethod.Post,
+                    $"{_objectEndpoint}/{fileName}");
 
-                var path = Path.Combine(RootDirectory, fileName);
+                request.Headers.TryAddWithoutValidation(
+                    "x-upsert",
+                    "false");
 
-                await using var output = new FileStream(
-                    path,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    81920,
-                    useAsync: true);
+                request.Content = new StreamContent(image);
 
-                await output.WriteAsync(header);
-                await input.CopyToAsync(output);
+                request.Content.Headers.ContentType =
+                    new MediaTypeHeaderValue(extension switch
+                    {
+                        ".jpg" => "image/jpeg",
+                        ".png" => "image/png",
+                        ".webp" => "image/webp",
+                        _ => throw new InvalidOperationException()
+                    });
+
+                // Track before sending in case the response is lost.
+                savedUrls.Add(publicUrl);
+
+                using var response = await client.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "Supabase profile upload failed with HTTP {StatusCode}",
+                        (int)response.StatusCode);
+
+                    throw new BadHttpRequestException(
+                        "Profile photo upload failed. Please try again.",
+                        StatusCodes.Status502BadGateway);
+                }
             }
 
             return savedUrls;
         }
-        catch
+        catch (Exception exception)
         {
-            DeleteFiles(savedUrls);
+            await DeleteFilesAsync(savedUrls);
+
+            if (exception is HttpRequestException
+                or OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    "Supabase profile upload failed: {FailureType}",
+                    exception.GetType().Name);
+
+                throw new BadHttpRequestException(
+                    "Image storage is unavailable. Please try again.",
+                    StatusCodes.Status502BadGateway);
+            }
+
             throw;
         }
     }
 
-    public void DeleteFiles(IEnumerable<string> urls)
+    public async Task DeleteFilesAsync(IEnumerable<string?> urls)
     {
+        using var client =
+            _httpClientFactory.CreateClient("SupabaseStorage");
+
         foreach (var url in urls.Distinct())
         {
-            if (!url.StartsWith(UrlPrefix, StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(url))
                 continue;
 
-            var fileName = Path.GetFileName(url);
+            // Handle existing local profile photos.
+            if (url.StartsWith(
+                LocalUrlPrefix,
+                StringComparison.Ordinal))
+            {
+                var fileName = url[LocalUrlPrefix.Length..];
 
-            if (url != UrlPrefix + fileName)
+                if (!IsSafeFileName(fileName))
+                    continue;
+
+                try
+                {
+                    File.Delete(
+                        Path.Combine(RootDirectory, fileName));
+                }
+                catch (Exception exception)
+                    when (exception is IOException
+                        or UnauthorizedAccessException)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Could not remove local profile photo {FileName}",
+                        fileName);
+                }
+
                 continue;
+            }
 
-            if (!Guid.TryParseExact(
-                Path.GetFileNameWithoutExtension(fileName),
-                "N",
-                out _))
+            // Only delete from our configured profile bucket.
+            if (!url.StartsWith(
+                _publicUrlPrefix,
+                StringComparison.Ordinal))
+            {
                 continue;
+            }
 
-            var extension = Path.GetExtension(fileName);
+            var objectName = url[_publicUrlPrefix.Length..];
 
-            if (extension is not ".jpg" and not ".png" and not ".webp")
+            if (!IsSafeFileName(objectName))
                 continue;
 
             try
             {
-                File.Delete(Path.Combine(RootDirectory, fileName));
+                using var request = CreateRequest(
+                    HttpMethod.Delete,
+                    _objectEndpoint);
+
+                request.Content = JsonContent.Create(new
+                {
+                    prefixes = new[] { objectName }
+                });
+
+                using var response = await client.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode
+                    && response.StatusCode != HttpStatusCode.NotFound)
+                {
+                    _logger.LogWarning(
+                        "Could not remove Supabase profile photo " +
+                        "{FileName}. HTTP {StatusCode}",
+                        objectName,
+                        (int)response.StatusCode);
+                }
             }
             catch (Exception exception)
-                when (exception is IOException or UnauthorizedAccessException)
+                when (exception is HttpRequestException
+                    or OperationCanceledException)
             {
+                // Cleanup failure must not hide the original error.
                 _logger.LogWarning(
-                    exception,
-                    "Could not remove profile photo {FileName}",
-                    fileName);
+                    "Could not remove Supabase profile photo " +
+                    "{FileName}: {FailureType}",
+                    objectName,
+                    exception.GetType().Name);
             }
         }
     }
 
+    private HttpRequestMessage CreateRequest(
+        HttpMethod method,
+        string url)
+    {
+        var request = new HttpRequestMessage(method, url);
+
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                _serviceRoleKey);
+
+        request.Headers.Add("apikey", _serviceRoleKey);
+
+        return request;
+    }
+
+    private static string Required(
+        IConfiguration configuration,
+        string key)
+    {
+        var value = configuration[key];
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"Missing configuration: {key}");
+        }
+
+        return value.Trim();
+    }
+
+    private static bool IsSafeFileName(string fileName)
+    {
+        if (fileName.Length is not 36 and not 37)
+            return false;
+
+        if (!Guid.TryParseExact(
+            fileName[..32],
+            "N",
+            out _))
+        {
+            return false;
+        }
+
+        return fileName[32..] is ".jpg" or ".png" or ".webp";
+    }
+
     private static string? DetectExtension(byte[] header)
     {
-        if (header[0] == 0xFF &&
-            header[1] == 0xD8 &&
-            header[2] == 0xFF)
+        if (header[0] == 0xFF
+            && header[1] == 0xD8
+            && header[2] == 0xFF)
         {
             return ".jpg";
         }
@@ -149,8 +342,8 @@ public class ProfileImageStore
             return ".png";
         }
 
-        if (Encoding.ASCII.GetString(header, 0, 4) == "RIFF" &&
-            Encoding.ASCII.GetString(header, 8, 4) == "WEBP")
+        if (Encoding.ASCII.GetString(header, 0, 4) == "RIFF"
+            && Encoding.ASCII.GetString(header, 8, 4) == "WEBP")
         {
             return ".webp";
         }

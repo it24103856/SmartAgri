@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using SmartAgri.Api.Data;
 using SmartAgri.Api.DTOs;
 using SmartAgri.Api.Interfaces;
@@ -82,7 +83,17 @@ public class UserService : IUserService
         if (user == null) return false;
 
         _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            _context.Entry(user).State = EntityState.Unchanged;
+            throw new InvalidOperationException(
+                "This user cannot be deleted because they have linked records. Deactivate or block the user instead.", ex);
+        }
         return true;
     }
 

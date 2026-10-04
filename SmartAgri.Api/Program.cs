@@ -12,7 +12,6 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.DataProtection;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
-using SmartAgri.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +21,18 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+
+builder.Services
+    .AddHttpClient("SupabaseStorage", client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(60);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false
+    });
+
+builder.Services.AddSingleton<ProductImageStore>();
 builder.Services.AddSingleton<ProductImageStore>();
 builder.Services.AddSingleton<CategoryImageStore>();
 builder.Services.AddSingleton<ProfileImageStore>();
@@ -30,6 +41,7 @@ builder.Services.AddScoped<IPackageService, PackageService>();
 builder.Services.AddScoped<PackagePaymentService>();
 builder.Services.AddSingleton<FarmImageStore>();
 builder.Services.AddSingleton<PackageImageStore>();
+
 
 // 2. Swagger Configuration with JWT Authorize Button
 builder.Services.AddSwaggerGen(options =>
@@ -155,6 +167,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddDataProtection();
 builder.Services.AddScoped<CustomerCheckoutService>();
+builder.Services.AddSingleton<OrderReceiptStore>();
 builder.Services.AddScoped<AdminOrderService>();
 builder.Services.AddScoped<CustomerOrderCancellationService>();
 builder.Services.AddTransient<EmailService>();

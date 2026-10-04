@@ -53,7 +53,7 @@ public class AuthController : ControllerBase
         }
         catch
         {
-            images.DeleteFiles(urls);
+            await images.DeleteFilesAsync(urls);
             throw;
         }
     }
@@ -151,10 +151,13 @@ public async Task<IActionResult> Session(
         }
         catch
         {
-            images.DeleteFiles(urls);
+            await images.DeleteFilesAsync(urls);
             throw;
         }
-        if (oldUrl is not null) images.DeleteFiles(new[] { oldUrl });
+
+        if (oldUrl is not null)
+            await images.DeleteFilesAsync(new[] { oldUrl });
+
         return Ok(new { profileImageUrl = user.ProfileImageUrl });
     }
 

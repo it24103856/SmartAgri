@@ -35,3 +35,6 @@
 *.log
 .DS_Store
 Thumbs.db
+
+# Storage migration journals (may contain private record identifiers)
+storage-migration-manifests/

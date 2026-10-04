@@ -13,6 +13,13 @@ namespace SmartAgri.Api.Tests;
 
 public sealed class CustomerOrderAccessTests
 {
+    private sealed class FailSave : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
+    {
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(
+            Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result,
+            CancellationToken cancellationToken = default) => throw new DbUpdateException("Simulated save failure");
+    }
     [Fact]
     public async Task Customer_cannot_read_another_customers_order()
     {
@@ -38,12 +45,13 @@ public sealed class CustomerOrderAccessTests
             CommandTimeout = 30
         }.ConnectionString;
 
-        ApplicationDbContext NewDb()
+        ApplicationDbContext NewDb(bool failSave = false)
         {
-            var options =
+            var builder =
                 new DbContextOptionsBuilder<ApplicationDbContext>()
-                    .UseNpgsql(connectionString)
-                    .Options;
+                    .UseNpgsql(connectionString);
+            if (failSave) builder.AddInterceptors(new FailSave());
+            var options = builder.Options;
 
             return new ApplicationDbContext(options);
         }
@@ -137,6 +145,94 @@ public sealed class CustomerOrderAccessTests
             var orderBId = await CreateOrder(customerB);
 
             Assert.NotEqual(orderAId, orderBId);
+
+            // Legacy receipt bytes remain available only to the owner or an active admin.
+            var admin = new User { FullName = "Receipt Admin", Email = "receipt-admin@example.test",
+                PasswordHash = "test", Role = "ADMIN", Status = "ACTIVE" };
+            setup.Users.Add(admin);
+            byte[] legacyBytes = [255, 216, 255, 1];
+            var legacy = new OrderPaymentProof { OrderId = orderAId, Amount = 250m,
+                Receipt = legacyBytes, ContentType = "image/jpeg", TransferReference = "legacy" };
+            setup.OrderPaymentProofs.Add(legacy);
+            await setup.SaveChangesAsync();
+            System.Security.Claims.ClaimsPrincipal Principal(User user, string? role = null) => new(
+                new System.Security.Claims.ClaimsIdentity(new[] {
+                    new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, role ?? user.Role)
+                }, "test"));
+            await using (var receiptDb = NewDb())
+            {
+                var service = NewService(receiptDb);
+                Assert.Equal(legacyBytes, (await service.OrderReceipt(Principal(customerA), legacy.Id)).Bytes);
+                Assert.Equal(legacyBytes, (await service.OrderReceipt(Principal(admin), legacy.Id)).Bytes);
+                Assert.Equal(404, (await Assert.ThrowsAsync<BadHttpRequestException>(
+                    () => service.OrderReceipt(Principal(customerB), legacy.Id))).StatusCode);
+                Assert.Equal(403, (await Assert.ThrowsAsync<BadHttpRequestException>(
+                    () => service.OrderReceipt(Principal(customerB, "ADMIN"), legacy.Id))).StatusCode);
+            }
+
+            await using (var paymentSetup = NewDb())
+            {
+                var order = await paymentSetup.CustomerOrders.Include(o => o.Payment).SingleAsync(o => o.Id == orderBId);
+                order.Status = "AwaitingPayment";
+                order.Payment.Method = "BANK_TRANSFER";
+                order.Payment.Status = "Pending";
+                await paymentSetup.SaveChangesAsync();
+            }
+            var bankConfig = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+                ["OrderBankTransfer:BankName"] = "Test bank", ["OrderBankTransfer:AccountName"] = "Test name",
+                ["OrderBankTransfer:AccountNumber"] = "123"
+            }).Build();
+            SubmitPackageReceiptDto Upload()
+            {
+                byte[] png = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0];
+                return new() { TransferReference = "test", Receipt = new FormFile(new MemoryStream(png), 0, png.Length, "Receipt", "receipt.png") };
+            }
+            foreach (var failDatabase in new[] { false, true })
+            {
+                var cleanup = false;
+                var storage = OrderReceiptStorageTests.Store(new OrderReceiptStorageTests.Factory(request => {
+                    if (request.Method == HttpMethod.Delete) { cleanup = true; return new(System.Net.HttpStatusCode.OK); }
+                    return new(failDatabase ? System.Net.HttpStatusCode.OK : System.Net.HttpStatusCode.ServiceUnavailable);
+                }));
+                await using var uploadDb = NewDb(failDatabase);
+                var service = new CustomerCheckoutService(uploadDb, bankConfig, new EphemeralDataProtectionProvider(), storage);
+                if (failDatabase)
+                    await Assert.ThrowsAsync<DbUpdateException>(() => service.SubmitOrderReceipt(Principal(customerB), orderBId, Upload()));
+                else
+                    Assert.Equal(502, (await Assert.ThrowsAsync<BadHttpRequestException>(() =>
+                        service.SubmitOrderReceipt(Principal(customerB), orderBId, Upload()))).StatusCode);
+                Assert.True(cleanup);
+                await using var verifyReceipt = NewDb();
+                Assert.False(await verifyReceipt.OrderPaymentProofs.AnyAsync(p => p.OrderId == orderBId));
+            }
+
+            string? cloudKey = null;
+            byte[] cloudBytes = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0];
+            var cloudStorage = OrderReceiptStorageTests.Store(new OrderReceiptStorageTests.Factory(request => {
+                if (request.Method == HttpMethod.Post) {
+                    cloudKey = Path.GetFileName(request.RequestUri!.AbsolutePath);
+                    return new(System.Net.HttpStatusCode.OK);
+                }
+                Assert.Equal(HttpMethod.Get, request.Method);
+                return new(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(cloudBytes) };
+            }));
+            await using (var cloudDb = NewDb())
+            {
+                var service = new CustomerCheckoutService(cloudDb, bankConfig, new EphemeralDataProtectionProvider(), cloudStorage);
+                await service.SubmitOrderReceipt(Principal(customerB), orderBId, Upload());
+                var savedProof = await cloudDb.OrderPaymentProofs.SingleAsync(p => p.OrderId == orderBId);
+                Assert.Equal(cloudKey, savedProof.ReceiptObjectKey);
+                Assert.Empty(savedProof.Receipt);
+                Assert.Equal("image/png", savedProof.ContentType);
+                Assert.Equal(250m, savedProof.Amount);
+                Assert.Equal(cloudBytes, (await service.OrderReceipt(Principal(customerB), savedProof.Id)).Bytes);
+                Assert.Equal(cloudBytes, (await service.OrderReceipt(Principal(admin), savedProof.Id)).Bytes);
+                Assert.Equal(404, (await Assert.ThrowsAsync<BadHttpRequestException>(() =>
+                    service.OrderReceipt(Principal(customerA), savedProof.Id))).StatusCode);
+                Assert.Equal(409, (await Assert.ThrowsAsync<BadHttpRequestException>(() =>
+                    service.SubmitOrderReceipt(Principal(customerB), orderBId, Upload()))).StatusCode);
+            }
 
             // Both owners must be able to read their own orders.
             await using (var ownerDb = NewDb())

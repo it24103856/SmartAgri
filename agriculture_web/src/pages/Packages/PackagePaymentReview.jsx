@@ -156,6 +156,7 @@ export default function PackagePaymentReview({ onReviewed, basePath = '/package-
                 <th>Stage</th>
                 <th>Amount</th>
                 <th>Reference</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -167,20 +168,21 @@ export default function PackagePaymentReview({ onReviewed, basePath = '/package-
                   <td>{receipt.stage}</td>
                   <td>Rs. {Number(receipt.amount).toFixed(2)}</td>
                   <td>{receipt.transferReference}</td>
+                  <td>{receipt.status ?? 'SUBMITTED'}</td>
                   <td>
                     <button
                       className="cat-button"
                       disabled={busy}
                       onClick={() => open(receipt)}
                     >
-                      Review receipt
+                      {(receipt.status ?? 'SUBMITTED') === 'SUBMITTED' ? 'Review receipt' : 'View receipt'}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {items.length === 0 && <p>No receipts awaiting verification.</p>}
+          {items.length === 0 && <p>No payment receipts found.</p>}
         </div>
       )}
 
@@ -195,43 +197,55 @@ export default function PackagePaymentReview({ onReviewed, basePath = '/package-
 
           <ReceiptImage key={`${basePath}:${selected.id}`} id={selected.id} basePath={basePath} />
 
-          <label style={{ display: 'block', margin: '16px 0' }}>
-            <input
-              type="checkbox"
-              checked={verified}
-              disabled={busy}
-              onChange={(event) => setVerified(event.target.checked)}
-            />
-            {' '}I verified this amount in the bank account and checked that
-            this transfer has not been credited to another order or booking.
-          </label>
+          {(selected.status ?? 'SUBMITTED') === 'SUBMITTED' && (
+            <>
+              <label style={{ display: 'block', margin: '16px 0' }}>
+                <input
+                  type="checkbox"
+                  checked={verified}
+                  disabled={busy}
+                  onChange={(event) => setVerified(event.target.checked)}
+                />
+                {' '}I verified this amount in the bank account and checked that
+                this transfer has not been credited to another order or booking.
+              </label>
 
-          <textarea
-            value={note}
-            maxLength={500}
-            rows={3}
-            disabled={busy}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Admin note. Required when rejecting."
-            style={{ width: '100%', marginBottom: 12 }}
-          />
+              <textarea
+                value={note}
+                maxLength={500}
+                rows={3}
+                disabled={busy}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Admin note. Required when rejecting."
+                style={{ width: '100%', marginBottom: 12 }}
+              />
+            </>
+          )}
+
+          {(selected.status ?? 'SUBMITTED') !== 'SUBMITTED' && selected.adminNote && (
+            <p>Admin note: {selected.adminNote}</p>
+          )}
 
           <div className="cat-row-actions">
-            <button
-              className="cat-button cat-button-primary"
-              disabled={busy || !verified}
-              onClick={() => review(true)}
-            >
-              Approve payment
-            </button>
+            {(selected.status ?? 'SUBMITTED') === 'SUBMITTED' && (
+              <>
+                <button
+                  className="cat-button cat-button-primary"
+                  disabled={busy || !verified}
+                  onClick={() => review(true)}
+                >
+                  Approve payment
+                </button>
 
-            <button
-              className="cat-button cat-button-danger"
-              disabled={busy}
-              onClick={() => review(false)}
-            >
-              Reject receipt
-            </button>
+                <button
+                  className="cat-button cat-button-danger"
+                  disabled={busy}
+                  onClick={() => review(false)}
+                >
+                  Reject receipt
+                </button>
+              </>
+            )}
 
             <button
               className="cat-button"

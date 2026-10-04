@@ -9,6 +9,7 @@ public sealed class OrderPaymentProof
     public decimal Amount { get; set; }
     public string TransferReference { get; set; } = "";
     [JsonIgnore] public byte[] Receipt { get; set; } = [];
+    [JsonIgnore] public string? ReceiptObjectKey { get; set; }
     public string ContentType { get; set; } = "image/jpeg";
     public string Status { get; set; } = "SUBMITTED";
     public string? AdminNote { get; set; }

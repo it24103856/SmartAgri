@@ -100,12 +100,12 @@ public sealed class CustomerProfileController : ControllerBase
         }
         catch
         {
-            _images.DeleteFiles(newPhotos);
+           await _images.DeleteFilesAsync(newPhotos);
             throw;
         }
 
         if (newPhotos.Count > 0 && oldPhoto is not null)
-            _images.DeleteFiles(new[] { oldPhoto });
+           await _images.DeleteFilesAsync(new[] { oldPhoto });
 
         return Ok(ToDto(user));
     }

@@ -109,7 +109,7 @@ public class FarmService : IFarmService
         {
             if (uploadedUrls.Count > 0)
             {
-                _imageStore.DeleteFiles(uploadedUrls);
+                await _imageStore.DeleteFilesAsync(uploadedUrls);
             }
             throw;
         }
@@ -172,14 +172,14 @@ public class FarmService : IFarmService
 
             if (removedUrls.Count > 0)
             {
-                _imageStore.DeleteFiles(removedUrls);
+                await _imageStore.DeleteFilesAsync(removedUrls);
             }
         }
         catch
         {
             if (newUploadedUrls.Count > 0)
             {
-                _imageStore.DeleteFiles(newUploadedUrls);
+                await _imageStore.DeleteFilesAsync(newUploadedUrls);
             }
             throw;
         }
@@ -208,7 +208,7 @@ public class FarmService : IFarmService
 
         if (urlsToDelete.Count > 0)
         {
-            _imageStore.DeleteFiles(urlsToDelete);
+            await _imageStore.DeleteFilesAsync(urlsToDelete);
         }
 
         _logger.LogInformation("Farm ID {FarmId} deleted for Farmer ID {FarmerId}", farmId, farmerId);

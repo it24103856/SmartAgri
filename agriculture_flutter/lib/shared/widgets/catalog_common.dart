@@ -1,11 +1,28 @@
+import 'dart:io' show SocketException;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/constants/api_constants.dart';
 import '../../core/widgets/app_glass_background.dart';
 import '../../features/auth/data/services/auth_service.dart';
 import '../../features/products/data/services/catalog_service.dart';
+
+void logCatalogImageError(String url, Object error) {
+  if (!kDebugMode) return;
+
+  final uri = Uri.tryParse(url);
+  // Never log query strings, credentials, headers or exception text, which
+  // can contain signed URLs or tokens. Keep the failure type and HTTP status.
+  final source = uri == null ? 'invalid URL' : '${uri.scheme}://${uri.host}';
+  final status = error is NetworkImageLoadException
+      ? ', HTTP ${error.statusCode}'
+      : error is SocketException
+      ? ', OS error ${error.osError?.errorCode}: ${error.osError?.message}'
+      : '';
+  debugPrint('Catalog image failed ($source): ${error.runtimeType}$status');
+}
 
 Future<void> signOutCustomer(BuildContext context) async {
   await AuthService.instance.logout();
@@ -57,7 +74,10 @@ class CatalogImage extends StatelessWidget {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (_, error, stackTrace) => fallback,
+              errorBuilder: (_, error, stackTrace) {
+                logCatalogImageError(imageUrl, error);
+                return fallback;
+              },
               loadingBuilder: (_, child, progress) {
                 if (progress == null) return child;
 

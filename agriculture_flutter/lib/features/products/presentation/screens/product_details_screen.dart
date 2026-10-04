@@ -498,7 +498,10 @@ class _ProductHeroGalleryState extends State<_ProductHeroGallery> {
       height: double.infinity,
       fit: BoxFit.contain,
       alignment: Alignment.center,
-      errorBuilder: (_, error, stackTrace) => fallback,
+      errorBuilder: (_, error, stackTrace) {
+        logCatalogImageError(url, error);
+        return fallback;
+      },
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
 

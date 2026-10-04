@@ -102,7 +102,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         : Image.network(
             url,
             fit: fit,
-            errorBuilder: (_, error, stack) => Center(child: fallback),
+            errorBuilder: (_, error, stack) {
+              logCatalogImageError(url, error);
+              return Center(child: fallback);
+            },
           );
   }
 

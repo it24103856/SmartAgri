@@ -76,11 +76,18 @@ public class UserController : ControllerBase
     [HttpDelete(UserRoutes.Delete)]
     public async Task<IActionResult> DeleteUser(int id)
     {
-        var success = await _userService.DeleteUserAsync(id);
-        if (!success)
-            return NotFound(new { message = "User not found" });
+        try
+        {
+            var success = await _userService.DeleteUserAsync(id);
+            if (!success)
+                return NotFound(new { message = "User not found" });
 
-        return Ok(new { message = "User deleted successfully" });
+            return Ok(new { message = "User deleted successfully" });
+        }
+        catch (InvalidOperationException ex) when (ex.InnerException is Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     // 7. PUT: api/users/{id}/activate

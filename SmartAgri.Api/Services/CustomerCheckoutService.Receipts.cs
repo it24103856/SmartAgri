@@ -63,6 +63,9 @@ public sealed partial class CustomerCheckoutService
         if (!OrderBankConfigured()) throw new BadHttpRequestException("Bank details are not configured.", 503);
         if (string.IsNullOrWhiteSpace(dto.TransferReference) || dto.TransferReference.Trim().Length > 100)
             throw new BadHttpRequestException("Enter a valid transfer reference.");
+        if (await _db.OrderPaymentProofs.AnyAsync(p => p.OrderId == id &&
+            (p.Status == "SUBMITTED" || p.Status == "APPROVED")))
+            throw new BadHttpRequestException("A receipt is already pending or approved.", 409);
         var file = dto.Receipt;
         if (file == null || file.Length < 12 || file.Length > 5 * 1024 * 1024)
             throw new BadHttpRequestException("Choose a receipt image up to 5 MB.");
@@ -74,9 +77,20 @@ public sealed partial class CustomerCheckoutService
             : bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255 ? "image/jpeg"
             : System.Text.Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF" && System.Text.Encoding.ASCII.GetString(bytes, 8, 4) == "WEBP" ? "image/webp" : null;
         if (type == null) throw new BadHttpRequestException("Use a JPG, PNG or WebP receipt.");
-        _db.OrderPaymentProofs.Add(new() { OrderId = id, Amount = order.TotalAmount,
-            TransferReference = dto.TransferReference.Trim(), Receipt = bytes, ContentType = type });
-        await _db.SaveChangesAsync();
+        var storage = _orderReceipts ?? throw new InvalidOperationException("Order receipt storage is not configured.");
+        var objectKey = await storage.UploadAsync(bytes, type);
+        try
+        {
+            _db.OrderPaymentProofs.Add(new() { OrderId = id, Amount = order.TotalAmount,
+                TransferReference = dto.TransferReference.Trim(), Receipt = [],
+                ReceiptObjectKey = objectKey, ContentType = type });
+            await _db.SaveChangesAsync();
+        }
+        catch
+        {
+            await storage.TryDeleteAsync(objectKey);
+            throw;
+        }
     }
 
     public async Task<object> PendingOrderReceipts(ClaimsPrincipal principal)
@@ -95,8 +109,13 @@ public sealed partial class CustomerCheckoutService
         var actor = await ReceiptActor(principal, admin);
         var proof = await _db.OrderPaymentProofs.AsNoTracking()
             .Where(p => p.Id == id && (admin || p.Order.UserId == actor))
-            .Select(p => new { p.Receipt, p.ContentType }).SingleOrDefaultAsync()
+            .Select(p => new { p.Receipt, p.ReceiptObjectKey, p.ContentType }).SingleOrDefaultAsync()
             ?? throw new BadHttpRequestException("Receipt not found.", 404);
+        if (proof.ReceiptObjectKey is not null)
+        {
+            var storage = _orderReceipts ?? throw new InvalidOperationException("Order receipt storage is not configured.");
+            return (await storage.DownloadAsync(proof.ReceiptObjectKey), proof.ContentType);
+        }
         return (proof.Receipt, proof.ContentType);
     }
 

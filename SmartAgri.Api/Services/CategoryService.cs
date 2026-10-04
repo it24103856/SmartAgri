@@ -72,7 +72,7 @@ public class CategoryService : ICategoryService
         }
         catch
         {
-            _images.DeleteFiles(uploaded);
+            await _images.DeleteFilesAsync(uploaded);
             throw;
         }
 
@@ -116,11 +116,12 @@ public class CategoryService : ICategoryService
         }
         catch
         {
-            _images.DeleteFiles(uploaded);
+            await _images.DeleteFilesAsync(uploaded);
             throw;
         }
+
         if (uploaded.Count > 0 && oldImage is not null)
-            _images.DeleteFiles(new[] { oldImage });
+            await _images.DeleteFilesAsync(new[] { oldImage });
 
         return await GetByIdAsync(id);
     }
@@ -149,7 +150,7 @@ public class CategoryService : ICategoryService
             await _context.SaveChangesAsync();
 
             if (category.ImageUrl is not null)
-                _images.DeleteFiles(new[] { category.ImageUrl });
+                await _images.DeleteFilesAsync(new[] { category.ImageUrl });
 
             return CategoryDeleteResult.Deleted;
         }
