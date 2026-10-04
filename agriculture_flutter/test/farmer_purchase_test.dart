@@ -146,9 +146,18 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets(
-    'farmer checkout opens bank receipt panel and loads farmer profile',
-    (tester) async {
+  for (final role in ['FARMER', 'CUSTOMER']) {
+    testWidgets('$role checkout opens the existing bank receipt panel', (
+      tester,
+    ) async {
+      await tester.runAsync(
+        () => TokenStorage.instance.saveSession(
+          token: 'test',
+          role: role,
+          fullName: 'Buyer',
+          email: 'buyer@test.example',
+        ),
+      );
       await tester.binding.setSurfaceSize(const Size(900, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final dio = ApiClient.instance.dio;
@@ -220,8 +229,9 @@ void main() {
                     'branch': 'Test',
                   },
                 };
-              } else if (request.path == '/farmer-profile') {
-                data = {...order, 'role': 'FARMER', 'status': 'ACTIVE'};
+              } else if (request.path == '/farmer-profile' ||
+                  request.path == '/customer-profile') {
+                data = {...order, 'role': role, 'status': 'ACTIVE'};
               } else if (request.path.endsWith('/tracking')) {
                 data = {'order': order, 'history': []};
               } else if (request.path == '/order-payments/orders/1') {
@@ -253,8 +263,14 @@ void main() {
         );
       await tester.pumpWidget(const MaterialApp(home: CheckoutScreen()));
       await tester.pumpAndSettle();
-      expect(requests.any((r) => r.path == '/farmer-profile'), isTrue);
-      expect(requests.any((r) => r.path == '/customer-profile'), isFalse);
+      expect(
+        requests.any((r) => r.path == '/farmer-profile'),
+        role == 'FARMER',
+      );
+      expect(
+        requests.any((r) => r.path == '/customer-profile'),
+        role == 'CUSTOMER',
+      );
       await tester.scrollUntilVisible(
         find.text('Continue to payment'),
         250,
@@ -267,6 +283,14 @@ void main() {
       );
       await tester.tap(find.text('Continue to payment'));
       await tester.pumpAndSettle();
+      if (role == 'CUSTOMER') {
+        final dropdown = find.byType(DropdownButtonFormField<String>);
+        await tester.ensureVisible(dropdown);
+        await tester.tap(dropdown);
+        await tester.pumpAndSettle();
+        await tester.tap(find.textContaining('Bank transfer').last);
+        await tester.pumpAndSettle();
+      }
       await tester.scrollUntilVisible(
         find.text('Place order & upload receipt'),
         250,
@@ -301,6 +325,6 @@ void main() {
       expect(find.text('Order bank transfer'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       expect(tester.takeException(), isNull);
-    },
-  );
+    });
+  }
 }

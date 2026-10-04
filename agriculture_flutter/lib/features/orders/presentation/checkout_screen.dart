@@ -876,13 +876,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     border: OutlineInputBorder(),
                                   ),
                                   items: [
-                                    if (_isFarmer)
-                                      const DropdownMenuItem(
-                                        value: 'BANK_TRANSFER',
-                                        child: Text(
-                                          'Bank transfer — upload receipt',
-                                        ),
+                                    const DropdownMenuItem(
+                                      value: 'BANK_TRANSFER',
+                                      child: Text(
+                                        'Bank transfer — upload receipt',
                                       ),
+                                    ),
                                     const DropdownMenuItem(
                                       value: 'COD',
                                       child: Text('Cash on Delivery'),

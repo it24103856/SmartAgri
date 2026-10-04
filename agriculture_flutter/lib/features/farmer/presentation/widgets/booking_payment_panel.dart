@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -5,12 +7,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../auth/data/services/profile_photo.dart';
+import '../../../orders/data/order_receipt_image.dart';
 
 class BookingPaymentPanel extends StatefulWidget {
   final int bookingId;
   final bool isOrder;
   final int refreshRevision;
   final Future<void> Function() onChanged;
+  final Future<ProfilePhoto?> Function()? pickReceipt;
 
   const BookingPaymentPanel({
     super.key,
@@ -18,6 +22,7 @@ class BookingPaymentPanel extends StatefulWidget {
     this.isOrder = false,
     this.refreshRevision = 0,
     required this.onChanged,
+    this.pickReceipt,
   });
 
   @override
@@ -30,6 +35,8 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
   Map<String, dynamic>? _summary;
   ProfilePhoto? _receipt;
   bool _busy = false;
+  bool _summaryCurrent = false;
+  bool _refreshPending = false;
   String? _error;
 
   Dio get _dio => ApiClient.instance.dio;
@@ -59,7 +66,21 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
 
   String _message(Object error) {
     if (error is DioException) {
-      final body = error.response?.data;
+      dynamic body = error.response?.data;
+      if (body is List<int>) {
+        try {
+          body = jsonDecode(utf8.decode(body));
+        } on FormatException {
+          body = null;
+        }
+      }
+
+      if (error.response?.statusCode == 401) {
+        return 'Your session expired. Please sign in again.';
+      }
+      if (error.response?.statusCode == 403) {
+        return 'You do not have access to this payment or receipt.';
+      }
 
       if (body is Map && body['message'] is String) {
         return body['message'] as String;
@@ -71,6 +92,12 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
             .join('\n');
       }
 
+      if (error.response?.statusCode == 413) {
+        return 'Choose a receipt image up to 5 MB.';
+      }
+      if (error.response == null) {
+        return 'Cannot reach SmartAgri. Check your connection and refresh payment status before retrying.';
+      }
       return 'Could not complete the request. Please retry.';
     }
 
@@ -81,6 +108,44 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
       'Rs. ${((value as num?) ?? 0).toDouble().toStringAsFixed(2)}';
 
   Future<void> _load() async {
+    if (_busy) {
+      _refreshPending = true;
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+      _summaryCurrent = false;
+    });
+
+    try {
+      await _fetchSummary();
+    } catch (error) {
+      if (mounted) setState(() => _error = _message(error));
+    } finally {
+      _finishOperation();
+    }
+  }
+
+  Future<void> _fetchSummary() async {
+    final response = await _dio.get<dynamic>(_resource);
+    if (!mounted) return;
+    setState(() {
+      _summary = Map<String, dynamic>.from(response.data as Map);
+      _summaryCurrent = true;
+    });
+  }
+
+  void _finishOperation() {
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (_refreshPending) {
+      _refreshPending = false;
+      unawaited(_load());
+    }
+  }
+
+  Future<void> _pick() async {
     if (_busy) return;
     setState(() {
       _busy = true;
@@ -88,38 +153,25 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
     });
 
     try {
-      final response = await _dio.get<dynamic>(_resource);
-
-      if (!mounted) return;
-
-      setState(() {
-        _summary = Map<String, dynamic>.from(response.data as Map);
-      });
-    } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _pick() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-
-    try {
-      final photo = await ProfilePhoto.pick();
+      final photo =
+          await (widget.pickReceipt?.call() ??
+              (widget.isOrder ? pickOrderReceipt() : ProfilePhoto.pick()));
       if (mounted && photo != null) {
-        setState(() => _receipt = photo);
+        final receipt = widget.isOrder
+            ? validateOrderReceipt(photo.bytes)
+            : photo;
+        setState(() => _receipt = receipt);
       }
     } catch (error) {
       if (mounted) setState(() => _error = _message(error));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _finishOperation();
     }
   }
 
   Future<void> _submit() async {
     if (_busy) return;
+    if (!_summaryCurrent || _summary?['canSubmit'] != true) return;
 
     if (_receipt == null || _reference.text.trim().isEmpty) {
       setState(() {
@@ -127,13 +179,27 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
       });
       return;
     }
+    if (_reference.text.trim().length > 100) {
+      setState(
+        () => _error = 'Enter a transfer reference of up to 100 characters.',
+      );
+      return;
+    }
+    if (widget.isOrder) {
+      try {
+        _receipt = validateOrderReceipt(_receipt!.bytes);
+      } catch (error) {
+        setState(() => _error = _message(error));
+        return;
+      }
+    }
 
     setState(() {
       _busy = true;
       _error = null;
     });
 
-    var succeeded = false;
+    var submitted = false;
 
     try {
       await _dio.post<dynamic>(
@@ -143,6 +209,11 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
           'receipt': MultipartFile.fromBytes(
             _receipt!.bytes,
             filename: _receipt!.name,
+            contentType: widget.isOrder
+                ? DioMediaType.parse(
+                    'image/${_receipt!.name.endsWith('.jpg') ? 'jpeg' : _receipt!.name.split('.').last}',
+                  )
+                : null,
           ),
         }),
       );
@@ -151,28 +222,49 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
 
       _reference.clear();
       setState(() => _receipt = null);
-      succeeded = true;
+      submitted = true;
+      setState(() => _summaryCurrent = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Receipt submitted. Waiting for admin verification.'),
         ),
       );
+      try {
+        await _fetchSummary();
+      } finally {
+        if (mounted) await widget.onChanged();
+      }
     } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
+      if (!mounted) return;
+      final message = submitted
+          ? 'Receipt submitted, but status could not be refreshed. Check payment status. ${_message(error)}'
+          : _message(error);
+      setState(() {
+        _summaryCurrent = false;
+        _error = message;
+      });
+      // A lost response or conflict can mean the server already accepted proof.
+      // Reconcile before allowing another submission; retain the draft on failure.
+      if (!submitted) {
+        try {
+          await _fetchSummary();
+        } catch (_) {
+          // Keep the original useful error and require a successful refresh.
+        }
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-
-    if (succeeded && mounted) {
-      await _load();
-      if (mounted) await widget.onChanged();
+      _finishOperation();
     }
   }
 
   Future<void> _viewReceipt(int id) async {
     if (_busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    Uint8List? receiptBytes;
 
     try {
       final response = await _dio.get<List<int>>(
@@ -182,37 +274,39 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
 
       if (!mounted) return;
 
-      final bytes = Uint8List.fromList(response.data!);
-
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Transfer receipt'),
-          content: SizedBox(
-            width: 320,
-            height: 400,
-            child: InteractiveViewer(
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.contain,
-                errorBuilder: (_, error, stack) =>
-                    const Text('This receipt could not be displayed.'),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
+      receiptBytes = Uint8List.fromList(response.data!);
     } catch (error) {
       if (mounted) setState(() => _error = _message(error));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _finishOperation();
     }
+
+    final bytes = receiptBytes;
+    if (!mounted || bytes == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Transfer receipt'),
+        content: SizedBox(
+          width: 320,
+          height: 400,
+          child: InteractiveViewer(
+            child: Image.memory(
+              bytes,
+              fit: BoxFit.contain,
+              errorBuilder: (_, error, stack) =>
+                  const Text('This receipt could not be displayed.'),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -220,7 +314,7 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
     final summary = _summary;
     final proofs = (summary?['proofs'] as List?) ?? [];
     final bank = summary?['bank'] as Map?;
-    final canSubmit = summary?['canSubmit'] == true;
+    final canSubmit = _summaryCurrent && summary?['canSubmit'] == true;
     final dueStage = summary?['dueStage'];
 
     return Padding(
@@ -287,7 +381,10 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
                 const Text(
                   'Pending verification. Do not transfer the same amount again.',
                 ),
-              if (raw['adminNote'] != null) Text('Admin: ${raw['adminNote']}'),
+              if (raw['adminNote'] != null)
+                Text(
+                  '${raw['status'] == 'REJECTED' ? 'Rejection reason' : 'Admin'}: ${raw['adminNote']}',
+                ),
               TextButton(
                 onPressed: _busy
                     ? null
@@ -303,6 +400,7 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
                 'For a rejected receipt, read the reason before making '
                 'another transfer.',
               ),
+              const Text('JPG, PNG or WebP, up to 5 MB.'),
               TextField(
                 controller: _reference,
                 enabled: !_busy,
@@ -319,7 +417,14 @@ class _BookingPaymentPanelState extends State<BookingPaymentPanel> {
                 ),
               ),
               if (_receipt != null)
-                Image.memory(_receipt!.bytes, height: 120, fit: BoxFit.contain),
+                Image.memory(
+                  _receipt!.bytes,
+                  height: 120,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, error, stack) => const Text(
+                    'This receipt could not be previewed. Choose another image.',
+                  ),
+                ),
               FilledButton(
                 onPressed: _busy ? null : _submit,
                 child: const Text('Submit for verification'),
