@@ -12,8 +12,34 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.DataProtection;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var renderPort = builder.Configuration["PORT"];
+if (!string.IsNullOrWhiteSpace(renderPort))
+{
+    if (!int.TryParse(renderPort, out var port) || port is < 1 or > 65535)
+    {
+        throw new InvalidOperationException("PORT must be an integer between 1 and 65535.");
+    }
+
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+
+var trustForwardedProto = builder.Configuration
+    .GetValue<bool>("ReverseProxy:TrustForwardedProto");
+if (trustForwardedProto)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        // Render terminates TLS. Trust only the final hop's scheme, not client IP or host.
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 // 1. Add Services to DI Container
 builder.Services.AddControllers();
@@ -254,6 +280,10 @@ builder.Services.AddHttpClient<FarmAiClient>(
     });
 
 var app = builder.Build();
+if (trustForwardedProto)
+{
+    app.UseForwardedHeaders();
+}
 if (app.Environment.IsDevelopment() &&
     app.Configuration.GetValue<bool>("Email:SendStartupTest"))
 {
@@ -357,5 +387,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+    .AllowAnonymous();
 
 app.Run();

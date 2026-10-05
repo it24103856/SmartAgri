@@ -1,0 +1,52 @@
+# Only API source and its linked catalog belong in this build context.
+**
+!SmartAgri.Api/
+!SmartAgri.Api/**
+!SmartAgri.Agent/
+!SmartAgri.Agent/crop_catalog.json
+!.dockerignore
+
+# Configuration is supplied at runtime, never baked into the image.
+**/appsettings*.json
+**/.env
+**/.env.*
+**/secrets.json
+**/secrets*.json
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/*.pubxml
+**/*.pubxml.user
+**/launchSettings.json
+**/*.http
+
+# Build outputs, developer tools and operational files.
+**/bin
+**/obj
+**/.vs
+**/.vscode
+**/.git
+**/.aws
+**/.agents
+**/.codex
+**/.venv
+**/__pycache__
+**/node_modules
+**/TestResults
+**/*.user
+**/*.suo
+**/*.log
+**/*.bak
+**/*.sql
+**/*.db
+**/*.sqlite*
+
+# Never copy uploaded media, private receipts or encryption keys.
+**/SmartAgri.Uploads
+**/uploads
+**/receipts
+**/Receipts
+**/App_Data
+**/DataProtection-Keys
+**/wwwroot/uploads
