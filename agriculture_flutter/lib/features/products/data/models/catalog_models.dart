@@ -56,12 +56,18 @@ class CatalogProduct {
   });
 
   factory CatalogProduct.fromJson(Map<String, dynamic> json) {
-    final images = (json['imageUrls'] as List? ?? [])
+    final legacyImage = json['imageUrl'] as String?;
+
+    var images = (json['imageUrls'] as List? ?? [])
         .whereType<String>()
         .where((url) => url.trim().isNotEmpty)
+        .map((url) {
+          if (!url.startsWith('http') && legacyImage != null && legacyImage.contains(url)) {
+            return legacyImage;
+          }
+          return url;
+        })
         .toList();
-
-    final legacyImage = json['imageUrl'] as String?;
 
     if (images.isEmpty &&
         legacyImage != null &&

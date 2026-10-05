@@ -31,9 +31,11 @@ class CatalogProduct {
       description = json['description'] as String?,
       price = (json['price'] as num).toDouble(),
       imageUrl = catalogImageUrl(
-        (json['imageUrls'] as List?)?.isNotEmpty == true
-            ? (json['imageUrls'] as List).first as String
-            : json['imageUrl'] as String?,
+        (json['imageUrl'] != null && json['imageUrl'].toString().startsWith('http')) 
+            ? json['imageUrl'] as String 
+            : ((json['imageUrls'] as List?)?.isNotEmpty == true 
+                ? (json['imageUrls'] as List).first as String 
+                : json['imageUrl'] as String?),
       ),
       assert((json['price'] as num) >= 0);
 }
