@@ -17,6 +17,7 @@ class CatalogImage extends StatelessWidget {
         : Image.network(
             url!,
             fit: fit,
+            webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
             errorBuilder: (context, error, stackTrace) => fallback,
             loadingBuilder: (context, child, progress) =>
                 progress == null ? child : fallback,

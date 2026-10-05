@@ -59,6 +59,7 @@ class CatalogImage extends StatelessWidget {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
+              webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
               errorBuilder: (_, error, stackTrace) {
                 logCatalogImageError(imageUrl, error);
                 return fallback;

@@ -19,7 +19,15 @@ Future<bool?> showFarmerPackageBooking(BuildContext context, Package package) =>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       useSafeArea: true,
-      builder: (_) => FarmerPage(child: _BookingSheet(package: package)),
+      builder: (_) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: FarmerGlassBackground(
+          child: Material(
+            color: Colors.transparent,
+            child: FarmerPage(child: _BookingSheet(package: package)),
+          ),
+        ),
+      ),
     );
 
 class PackagesScreen extends StatefulWidget {
