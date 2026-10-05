@@ -10,6 +10,7 @@ from farmer_ai import FarmAnalysisRequest, analyze_farm
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from basket_tools import validate_basket
 from schemas import (
@@ -37,6 +38,14 @@ app = FastAPI(
     title="SmartAgri Agent Service",
     version="0.2.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
