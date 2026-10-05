@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Lock, Mail, Leaf, Eye, EyeOff } from 'lucide-react';
-import axios from 'axios';
 import api from '../../services/api';
 
 const Login = ({ onLogin }) => {
@@ -17,7 +16,7 @@ const Login = ({ onLogin }) => {
 
     try {
       // Backend API Call එක
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await api.post('/auth/login', {
         email: email,
         password: password
       });

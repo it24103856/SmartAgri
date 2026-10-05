@@ -24,6 +24,7 @@
 .env.*
 !.env.example
 !.env.*.example
+!agriculture_web/.env.development-local
 
 # IDE temporary files
 **/.vs/

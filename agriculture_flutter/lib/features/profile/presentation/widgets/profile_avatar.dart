@@ -40,15 +40,14 @@ class ProfileAvatar extends StatelessWidget {
         errorBuilder: (_, error, stackTrace) => fallback(),
       );
     } else if (imageUrl?.trim().isNotEmpty ?? false) {
-      final url = Uri.parse(
-        ApiConstants.baseUrl,
-      ).resolve(imageUrl!.trim()).toString();
-
-      content = Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, error, stackTrace) => fallback(),
-      );
+      final url = ApiConstants.mediaUrl(imageUrl);
+      if (url != null) {
+        content = Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, error, stackTrace) => fallback(),
+        );
+      }
     }
 
     return Container(

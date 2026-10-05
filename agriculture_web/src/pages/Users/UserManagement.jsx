@@ -24,7 +24,7 @@ const PAGE_SIZE = 8;
 const UserAvatar = ({ user, large = false }) => {
   const [failedUrl, setFailedUrl] = useState(null);
   const imageUrl = user.profileImageUrl
-    ? new URL(user.profileImageUrl, new URL(api.defaults.baseURL, window.location.origin)).href
+    ? new URL(user.profileImageUrl, new URL(api.defaults.baseURL, window.location.origin).origin).href
     : null;
   const initials = (user.fullName || '?').trim().split(/\s+/)
     .slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase();

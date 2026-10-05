@@ -28,10 +28,10 @@ class ProfileAvatar extends StatelessWidget {
         errorBuilder: (_, error, stack) => fallback,
       );
     } else if (url != null && url!.isNotEmpty) {
-      final uri = Uri.parse(ApiConstants.baseUrl).resolve(url!);
-      if (uri.scheme == 'http' || uri.scheme == 'https') {
+      final imageUrl = ApiConstants.mediaUrl(url);
+      if (imageUrl != null) {
         photo = Image.network(
-          uri.toString(),
+          imageUrl,
           fit: BoxFit.cover,
           errorBuilder: (_, error, stack) => fallback,
           loadingBuilder: (_, child, progress) =>

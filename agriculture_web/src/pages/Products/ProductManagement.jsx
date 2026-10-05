@@ -45,7 +45,7 @@ const money = new Intl.NumberFormat('en-LK', {
 });
 
 const apiOrigin = new URL(
-  api.defaults.baseURL || 'http://localhost:5000/api',
+  api.defaults.baseURL,
   window.location.origin
 ).origin;
 

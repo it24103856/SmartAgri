@@ -34,22 +34,7 @@ class CatalogImage extends StatelessWidget {
   const CatalogImage(this.path, {super.key});
 
   String? get url {
-    final value = path?.trim();
-
-    if (value == null || value.isEmpty) return null;
-
-    final uri = Uri.tryParse(value);
-
-    if (uri == null) return null;
-
-    if (uri.hasScheme) {
-      return ['http', 'https'].contains(uri.scheme) ? uri.toString() : null;
-    }
-
-    // /uploads/products/image.jpg resolves against the API server.
-    return Uri.parse(
-      ApiConstants.baseUrl,
-    ).resolve('/${value.replaceFirst(RegExp(r'^/+'), '')}').toString();
+    return ApiConstants.mediaUrl(path);
   }
 
   @override

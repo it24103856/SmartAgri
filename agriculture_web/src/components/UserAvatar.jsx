@@ -6,7 +6,7 @@ export default function UserAvatar({ user, className = 'h-16 w-16' }) {
   let imageUrl = null;
   try {
     if (user?.profileImageUrl) {
-      const url = new URL(user.profileImageUrl, new URL(api.defaults.baseURL, window.location.origin));
+      const url = new URL(user.profileImageUrl, new URL(api.defaults.baseURL, window.location.origin).origin);
       if (['http:', 'https:'].includes(url.protocol)) imageUrl = url.href;
     }
   } catch {
