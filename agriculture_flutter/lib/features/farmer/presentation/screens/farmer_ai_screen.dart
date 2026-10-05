@@ -31,6 +31,7 @@ class _FarmerAiScreenState extends State<FarmerAiScreen> {
   final _excluded = <String>{};
 
   List<FarmModel> _farms = [];
+  List<Map<String, dynamic>> _cropCatalog = [];
   FarmModel? _farm;
 
   int _month = DateTime.now().month;
@@ -90,11 +91,13 @@ class _FarmerAiScreenState extends State<FarmerAiScreen> {
 
     try {
       final farms = await FarmService.instance.list();
+      final crops = await _api.cropCatalog();
 
       if (!mounted) return;
 
       setState(() {
         _farms = farms.where((farm) => farm.isActive).toList();
+        _cropCatalog = crops;
         _farm = _farms.isEmpty ? null : _farms.first;
       });
     } catch (error) {
@@ -318,7 +321,7 @@ class _FarmerAiScreenState extends State<FarmerAiScreen> {
                       eyebrow: 'Farmer AI',
                       title: 'Find suitable crops',
                       subtitle:
-                          'Compare chilli, okra and brinjal using '
+                          'Compare the Farm AI crop catalog using '
                           'your farm details. Leave values unknown '
                           'when you have not measured them.',
                       icon: Icons.auto_awesome_outlined,
@@ -430,20 +433,20 @@ class _FarmerAiScreenState extends State<FarmerAiScreen> {
                               Wrap(
                                 spacing: 8,
                                 children: [
-                                  for (final crop in [
-                                    'chilli',
-                                    'okra',
-                                    'brinjal',
-                                  ])
+                                  for (final record in _cropCatalog)
                                     FilterChip(
-                                      label: Text(crop),
-                                      selected: _excluded.contains(crop),
+                                      label: Text('${record['name']}'),
+                                      selected: _excluded.contains(
+                                        record['id'],
+                                      ),
                                       onSelected: (selected) {
                                         setState(() {
                                           if (selected) {
-                                            _excluded.add(crop);
+                                            _excluded.add(
+                                              record['id'] as String,
+                                            );
                                           } else {
-                                            _excluded.remove(crop);
+                                            _excluded.remove(record['id']);
                                           }
                                         });
                                       },
@@ -546,7 +549,10 @@ class _AnalysisResult extends StatelessWidget {
         'These crops are conditionally suitable. Review the checks below.',
       'NEEDS_INPUT' =>
         'More information is required. Update the form and analyze again.',
-      'NO_MATCH' => 'No crop matched the supplied conditions and exclusions.',
+      'NO_MATCH' =>
+        result['error_code'] == 'ALL_CROPS_EXCLUDED'
+            ? 'All catalog crops were excluded.'
+            : 'No crop has enough supported fit for a recommendation.',
       'FAILED' => 'The analysis failed. You can submit a new analysis.',
       'PROCESSING' =>
         'The analysis is still running. Check this request again shortly.',
@@ -573,6 +579,15 @@ class _AnalysisResult extends StatelessWidget {
               style: const TextStyle(color: Colors.red),
             ),
           _list('Required information', result['missing_fields']),
+          if (result['tool_results'] is Map)
+            for (final raw
+                in (result['tool_results'] as Map).values.whereType<Map>())
+              if (raw['eligible'] == false) ...[
+                const SizedBox(height: 12),
+                Text('${raw['name']}: ${raw['suitability']}'),
+                _list('Conflicts', raw['conflicts']),
+                _list('Checks needed', raw['checks_needed']),
+              ],
           if (status == 'COMPLETED')
             for (final raw in crops.whereType<Map>())
               FarmerGlassCard(

@@ -127,10 +127,7 @@ public sealed class FarmAiClient
                 "Completed analysis failed validation.");
         }
 
-        var allowed = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "chilli", "okra", "brinjal"
-        };
+        var allowed = new HashSet<string>(FarmCropCatalog.Ids, StringComparer.Ordinal);
 
         allowed.ExceptWith(excludedCropIds);
 

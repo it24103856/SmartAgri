@@ -111,6 +111,15 @@ class FarmAiService {
     });
   }
 
+  Future<List<Map<String, dynamic>>> cropCatalog() {
+    return _send(() async {
+      final response = await _dio.get<dynamic>('/AI/crop-catalog');
+      return ((response.data as Map)['crops'] as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    });
+  }
+
   Future<List<Map<String, dynamic>>> history(int page) {
     return _send(() async {
       final response = await _dio.get<dynamic>(
