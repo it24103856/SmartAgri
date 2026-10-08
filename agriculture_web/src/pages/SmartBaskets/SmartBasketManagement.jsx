@@ -329,7 +329,9 @@ function BasketReview({ id, onDecision }) {
               <li key={index} className="rounded-xl border border-gray-100 p-3 text-sm">
                 <div className="flex flex-wrap justify-between gap-2">
                   <strong>{step.agentName}</strong>
-                  <span>{step.status}</span>
+                  <span>
+                    {step.category ?? 'System'} · {step.status}
+                  </span>
                 </div>
                 <p className="text-gray-500">
                   Attempt {step.attempt} · {step.toolName ?? 'Agent step'}

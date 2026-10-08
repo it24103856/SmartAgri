@@ -8,7 +8,8 @@
     "dev:local": "vite --mode development-local",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/pages/Analytics/salesReport.test.js src/pages/Categories/categoryUtils.test.js src/pages/Products/productUtils.test.js src/pages/Orders/orderUtils.test.js src/pages/Packages/packageUtils.test.js src/pages/Users/userUtils.test.js src/pages/SmartBaskets/smartBasketUtils.test.js"
   },
   "dependencies": {
     "axios": "^1.19.0",

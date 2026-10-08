@@ -23,12 +23,13 @@ import '../Categories/CategoryManagement.css';
 import '../Products/ProductManagement.css';
 import './PackageManagement.css';
 import PackagePaymentReview from './PackagePaymentReview';
+import { categoryMeta, CATEGORIES, money } from './packageUtils';
 
-const CATEGORIES = [
-  { value: 'MACHINERY', label: 'Machinery & Land Prep', icon: Tractor, unit: 'acre' },
-  { value: 'INPUTS', label: 'Seeds & Fertilizer', icon: Wheat, unit: 'kg' },
-  { value: 'TRANSPORT', label: 'Transport & Logistics', icon: Truck, unit: 'km' },
-];
+const CATEGORY_ICONS = { MACHINERY: Tractor, INPUTS: Wheat, TRANSPORT: Truck };
+const packageCategoryMeta = (value) => ({
+  ...categoryMeta(value),
+  icon: CATEGORY_ICONS[categoryMeta(value).value],
+});
 
 const EMPTY_FORM = {
   name: '',
@@ -42,10 +43,6 @@ const EMPTY_FORM = {
   ratePerExtraKg: '',
   isActive: true,
 };
-
-function categoryMeta(value) {
-  return CATEGORIES.find((c) => c.value === value) ?? CATEGORIES[0];
-}
 
 function getError(error) {
   if (error.response?.status === 413) return 'Choose up to 6 images, no larger than 5 MB each.';
@@ -117,14 +114,6 @@ function Modal({ title, busy, onClose, children, wide = false, className = '' })
       {children}
     </dialog>
   );
-}
-
-function money(value) {
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
-    minimumFractionDigits: 2,
-  }).format(Number(value) || 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +274,7 @@ function PackageForm({ pkg, onClose, onSaved }) {
           <h3><span>02</span> Pricing & requirements</h3>
         <div className="package-fields">
           <label className="cat-field">
-            <span>Price per {categoryMeta(form.category).unit} (Rs.)</span>
+            <span>Price per {packageCategoryMeta(form.category).unit} (Rs.)</span>
             <input
               type="number"
               min="0.01"
@@ -701,7 +690,7 @@ export default function PackageManagement() {
                 </thead>
                 <tbody>
                   {filtered.map((pkg) => {
-                    const meta = categoryMeta(pkg.category);
+                    const meta = packageCategoryMeta(pkg.category);
                     const Icon = meta.icon;
 
                     return (
