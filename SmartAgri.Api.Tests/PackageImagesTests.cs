@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -48,11 +49,21 @@ public sealed class PackageImagesTests
             ["Supabase:ServiceRoleKey"] = "test-only-key",
             ["Supabase:PackageBucket"] = "packages"
         }).Build();
+        var uploaded = new List<string>();
+        var deleted = new List<string>();
         var store = new PackageImageStore(
             new TestEnvironment(),
             config,
             NullLogger<PackageImageStore>.Instance,
-            new OrderReceiptStorageTests.Factory(_ => new(System.Net.HttpStatusCode.OK)));
+            new OrderReceiptStorageTests.Factory(request =>
+            {
+                if (request.Method == HttpMethod.Post)
+                    uploaded.Add(request.RequestUri!.AbsolutePath);
+                else if (request.Method == HttpMethod.Delete)
+                    deleted.Add(request.RequestUri!.AbsolutePath);
+
+                return new(HttpStatusCode.OK);
+            }));
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connection.ConnectionString).Options);
         try
@@ -66,15 +77,18 @@ public sealed class PackageImagesTests
             var service = new PackageService(db, store);
             var created = await service.SaveWithImagesAsync(admin.Id, null, Form([Photo(), Photo()], "[\"new:1\",\"new:0\"]"));
             Assert.Equal(2, created.ImageUrls.Count);
-            Assert.All(created.ImageUrls, url => Assert.True(File.Exists(Path.Combine(directory, Path.GetFileName(url)))));
+            Assert.All(created.ImageUrls, url => Assert.StartsWith(
+                "https://storage.example.test/storage/v1/object/public/packages/",
+                url));
+            Assert.Equal(2, uploaded.Count);
 
             var edit = Form([Photo()], JsonSerializer.Serialize(new[] { "new:0", created.ImageUrls[1] }));
             edit.Version = created.Version;
             var saved = await service.SaveWithImagesAsync(admin.Id, created.Id, edit);
             Assert.NotEqual(created.ImageUrls[0], saved.ImageUrls[0]);
             Assert.Equal(created.ImageUrls[1], saved.ImageUrls[1]);
-            Assert.False(File.Exists(Path.Combine(directory, Path.GetFileName(created.ImageUrls[0]))));
-            Assert.Equal(2, Directory.GetFiles(directory).Length);
+            Assert.Single(deleted);
+            Assert.Equal(3, uploaded.Count);
             Assert.Equal(saved.ImageUrls, (await service.GetActiveAsync(farmer.Id, null)).Single().ImageUrls);
 
             var stale = Form([], "[]");
@@ -89,13 +103,13 @@ public sealed class PackageImagesTests
             // A later invalid file must clean up earlier writes in the same upload.
             Assert.Equal(400, (await Assert.ThrowsAsync<PackageOperationException>(() =>
                 service.SaveWithImagesAsync(admin.Id, null, Form([Photo(), Photo(invalid: true)], "[\"new:0\",\"new:1\"]")))).StatusCode);
-            Assert.Equal(2, Directory.GetFiles(directory).Length);
+            Assert.Equal(3, deleted.Count);
 
             var clear = Form([], "[]");
             clear.Version = saved.Version;
             var cleared = await service.SaveWithImagesAsync(admin.Id, saved.Id, clear);
             Assert.Empty(cleared.ImageUrls);
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Equal(5, deleted.Count);
         }
         finally
         {

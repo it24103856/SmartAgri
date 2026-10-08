@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Net;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -20,15 +21,11 @@ public class FarmerPurchaseTests
     [Fact]
     public async Task Farmer_orders_receipts_ownership_review_stock_and_history_work()
     {
-        var connection = Environment.GetEnvironmentVariable("SMARTAGRI_TEST_CONNECTION");
-        Assert.False(string.IsNullOrEmpty(connection));
-        var builder = new NpgsqlConnectionStringBuilder(connection) {
-            Database = $"smartagri_farmer_buy_{Guid.NewGuid():N}", Pooling = false
-        };
+        await using var database = await SupabaseTestDatabase.CreateAsync();
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(builder.ConnectionString).Options);
+            .UseNpgsql(database.ConnectionString).Options);
         try {
-            await db.Database.EnsureCreatedAsync();
+            await database.InitializeAsync(db);
             var farmer = new User { Email = "farmer@test.example", FullName = "Farmer", Role = "FARMER", PasswordHash = "test" };
             var other = new User { Email = "other@test.example", FullName = "Other", Role = "FARMER", PasswordHash = "test" };
             var admin = new User { Email = "admin@test.example", FullName = "Admin", Role = "ADMIN", PasswordHash = "test" };
@@ -40,7 +37,27 @@ public class FarmerPurchaseTests
             var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?> {
                 ["OrderBankTransfer:BankName"] = "Test bank", ["OrderBankTransfer:AccountName"] = "Test account", ["OrderBankTransfer:AccountNumber"] = "123"
             }).Build();
-            var service = new CustomerCheckoutService(db, config, new EphemeralDataProtectionProvider());
+            var receiptBytes = Convert.FromBase64String(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aRZkAAAAASUVORK5CYII=");
+            var receiptStorage = OrderReceiptStorageTests.Store(
+                new OrderReceiptStorageTests.Factory(request =>
+                {
+                    if (request.Method == HttpMethod.Post)
+                        return new(HttpStatusCode.OK);
+
+                    if (request.Method == HttpMethod.Get)
+                        return new(HttpStatusCode.OK)
+                        {
+                            Content = new ByteArrayContent(receiptBytes)
+                        };
+
+                    return new(HttpStatusCode.OK);
+                }));
+            var service = new CustomerCheckoutService(
+                db,
+                config,
+                new EphemeralDataProtectionProvider(),
+                receiptStorage);
             Assert.Equal(farmer.Id, await service.CustomerId(Principal(farmer)));
             CustomerCheckoutRequest Request(string method) => new() {
                 RequestId = Guid.NewGuid(), FullName = "Buyer", Email = "buyer@test.example", Phone = "0771234567",
@@ -81,6 +98,6 @@ public class FarmerPurchaseTests
             Assert.Equal("Confirmed", cod.Status);
             Assert.Equal("Unpaid", cod.Payment.Status);
         }
-        finally { await db.Database.EnsureDeletedAsync(); }
+        finally { }
     }
 }
