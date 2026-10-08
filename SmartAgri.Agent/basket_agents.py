@@ -26,6 +26,23 @@ from schemas import (
 logger = logging.getLogger("uvicorn.error")
 MODEL_NAME = "gemini-3.5-flash-lite"
 
+
+AGENT_CATEGORIES = {
+    "Planner": "Analysis",
+    "CatalogAgent": "Analysis",
+    "BasketAgent": "Action",
+    "Validator": "Validation",
+    "ReviewAgent": "Validation",
+}
+
+
+def agent_category(name: str) -> str:
+    try:
+        return AGENT_CATEGORIES[name]
+    except KeyError as error:
+        raise ValueError(f"Unknown basket agent: {name}") from error
+
+
 class ProposalRequest(StrictModel):
     workflow_id: UUID
     objective: str = Field(min_length=1, max_length=1000)
@@ -244,7 +261,7 @@ def _local_review(payload):
 
 
 def local_fallback(payload, output_type):
-    print(f"\n⚠️  [FALLBACK TRIGGERED] Generating local fallback for {output_type.__name__}")
+    print(f"\n[FALLBACK TRIGGERED] Generating local fallback for {output_type.__name__}")
     if output_type is BasketPlan:
         _local_list(payload["objective"])
         result = BasketPlan(goal="Prepare the customer's shopping list", excluded_foods=[],
@@ -441,31 +458,32 @@ async def ask_model(client, role, instruction, payload, output_type):
 
     output_schema = output_type.model_json_schema()
 
-    def resolve_refs(value, defs):
+    def clean_schema(value):
         if isinstance(value, dict):
-            if "$ref" in value:
-                ref_name = value["$ref"].split("/")[-1]
-                if ref_name in defs:
-                    resolved = defs[ref_name].copy()
-                    value.clear()
-                    value.update(resolved)
-                    resolve_refs(value, defs)
-            else:
-                for k, v in list(value.items()):
-                    if k in ("default", "title", "minLength", "maxLength", "additionalProperties", "minimum", "maximum", "minItems", "maxItems", "exclusiveMinimum", "exclusiveMaximum", "anyOf"):
-                        value.pop(k, None)
-                    else:
-                        resolve_refs(v, defs)
+            for k, v in list(value.items()):
+                if k in ("default", "title", "minLength", "maxLength", "additionalProperties"):
+                    value.pop(k, None)
+                elif k == "exclusiveMinimum" and value.get("type") == "integer":
+                    value["minimum"] = v + 1
+                    value.pop(k, None)
+                elif k == "exclusiveMaximum" and value.get("type") == "integer":
+                    value["maximum"] = v - 1
+                    value.pop(k, None)
+                else:
+                    clean_schema(v)
         elif isinstance(value, list):
             for item in value:
-                resolve_refs(item, defs)
+                clean_schema(item)
 
-    _schema_defs = output_schema.pop("$defs", {})
-    resolve_refs(output_schema, _schema_defs)
+    clean_schema(output_schema)
 
     if output_type is CatalogSelection:
-        # We handle empty catalog validation locally if needed.
-        pass
+        catalog = payload.get("catalog") if isinstance(payload, dict) else None
+        if not catalog:
+            properties = output_schema.get("properties", {})
+            for field in ("eligible_product_ids", "excluded_product_ids", "required_items"):
+                if field in properties:
+                    properties[field]["maxItems"] = 0
 
     if output_type is CatalogSelection:
         print("\n===== CATALOG OUTPUT SCHEMA =====")
@@ -517,26 +535,35 @@ async def ask_model(client, role, instruction, payload, output_type):
             )
 
             # Show the actual error before retrying or using fallback.
-            print(f"\n❌ [GEMINI API ERROR]")
+            print(f"\n[GEMINI API ERROR]")
             print(f"   Agent:   {role}")
             print(f"   Model:   {os.getenv('GEMINI_MODEL', MODEL_NAME)}")
             print(f"   Attempt: {attempt + 1}/{max_retries}")
             print(f"   Code:    {error_code}")
             print(f"   Message: {error_message}\n")
+            logger.error(
+                "agent=%s | model=%s | attempt=%s/%s | code=%s | message=%s",
+                role,
+                os.getenv("GEMINI_MODEL", MODEL_NAME),
+                attempt + 1,
+                max_retries,
+                error_code,
+                error_message,
+            )
 
             retryable = (
-                error_code in {400, 429, 500, 502, 503, 504}
+                error_code in {429, 500, 502, 503, 504}
                 or isinstance(e, httpx.TransportError)
             )
 
             if retryable and attempt < max_retries - 1:
                 delay = 15 * (2 ** attempt)
-                print(f"⚠️  Gemini rate limit / busy. Waiting {delay} seconds before retry {attempt + 2}...")
+                print(f"Gemini rate limit / busy. Waiting {delay} seconds before retry {attempt + 2}...")
                 await asyncio.sleep(delay)
                 continue
 
             if provider_error:
-                print(f"⚠️  WARNING: Using local catalog fallback for agent={role} after error code={error_code}.")
+                print(f"WARNING: Using local catalog fallback for agent={role} after error code={error_code}.")
                 return local_fallback(payload, output_type)
 
             raise
@@ -549,10 +576,10 @@ async def ask_model(client, role, instruction, payload, output_type):
     try:
         return output_type.model_validate_json(content)
     except ValidationError as ve:
-        print(f"\n❌ [VALIDATION ERROR in {role}]")
+        print(f"\n[VALIDATION ERROR in {role}]")
         print(f"Raw output from Gemini:\n{content}\n")
         print(f"Error details:\n{ve}\n")
-        print(f"⚠️  WARNING: Using local catalog fallback due to invalid JSON.")
+        print(f"WARNING: Using local catalog fallback due to invalid JSON.")
         return local_fallback(payload, output_type)
 
 
@@ -648,6 +675,7 @@ async def generate_proposal(request: ProposalRequest):
         step = {
             "sequence": len(steps) + 1,
             "agent": name,
+            "category": agent_category(name),
             "status": "Started",
             "started_at": now(),
         }
@@ -919,6 +947,7 @@ async def generate_proposal(request: ProposalRequest):
             build_step = {
                 "sequence": len(steps) + 1,
                 "agent": "BasketAgent",
+                "category": agent_category("BasketAgent"),
                 "tool": "build_basket",
                 "status": "Started",
                 "started_at": now(),
@@ -955,6 +984,7 @@ async def generate_proposal(request: ProposalRequest):
             steps.append({
                 "sequence": len(steps) + 1,
                 "agent": "Validator",
+                "category": agent_category("Validator"),
                 "tool": "validate_basket",
                 "status": (
                     "Completed" if validation.valid else "Failed"

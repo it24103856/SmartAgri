@@ -1,0 +1,47 @@
+name: SmartAgri Python Agent CI
+
+on:
+  push:
+    paths:
+      - "SmartAgri.Agent/**"
+      - ".github/workflows/agent-ci.yml"
+  pull_request:
+    paths:
+      - "SmartAgri.Agent/**"
+      - ".github/workflows/agent-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: SmartAgri.Agent
+
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: SmartAgri.Agent/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Python Agent unit tests
+        run: |
+          python -m unittest discover -s tests -p "test_*.py" -v

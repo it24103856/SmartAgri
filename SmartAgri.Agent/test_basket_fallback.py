@@ -7,6 +7,7 @@ from uuid import uuid4
 from google.genai import errors
 
 from basket_agents import (
+    AGENT_CATEGORIES, agent_category,
     BasketPlan, BasketReview, CatalogSelection, FALLBACK_LIST_REQUIRED,
     ProposalRejected, ProposalRequest, ask_model, generate_proposal,
     local_fallback,
@@ -28,6 +29,20 @@ def payload(objective="Apple", products=None, **extra):
 
 
 class LocalFallbackTests(unittest.TestCase):
+    def test_basket_agents_have_explicit_workflow_categories(self):
+        self.assertEqual(
+            AGENT_CATEGORIES,
+            {
+                "Planner": "Analysis",
+                "CatalogAgent": "Analysis",
+                "BasketAgent": "Action",
+                "Validator": "Validation",
+                "ReviewAgent": "Validation",
+            },
+        )
+        with self.assertRaises(ValueError):
+            agent_category("UnknownAgent")
+
     def test_extra_separators_do_not_reject_a_valid_list(self):
         products = [product(), product(2, "Orrange")]
         for objective in ("apple ,orrange,", ", apple,, ; orrange ; ",
