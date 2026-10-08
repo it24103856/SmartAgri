@@ -43,9 +43,16 @@ public sealed class PackageImagesTests
         var directory = Path.Combine(Path.GetTempPath(), $"smartagri-package-images-{Guid.NewGuid():N}");
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["PackageImages:Directory"] = directory
+            ["PackageImages:Directory"] = directory,
+            ["Supabase:Url"] = "https://storage.example.test",
+            ["Supabase:ServiceRoleKey"] = "test-only-key",
+            ["Supabase:PackageBucket"] = "packages"
         }).Build();
-        var store = new PackageImageStore(new TestEnvironment(), config, NullLogger<PackageImageStore>.Instance);
+        var store = new PackageImageStore(
+            new TestEnvironment(),
+            config,
+            NullLogger<PackageImageStore>.Instance,
+            new OrderReceiptStorageTests.Factory(_ => new(System.Net.HttpStatusCode.OK)));
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connection.ConnectionString).Options);
         try
