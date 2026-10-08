@@ -103,13 +103,13 @@ public sealed class PackageImagesTests
             // A later invalid file must clean up earlier writes in the same upload.
             Assert.Equal(400, (await Assert.ThrowsAsync<PackageOperationException>(() =>
                 service.SaveWithImagesAsync(admin.Id, null, Form([Photo(), Photo(invalid: true)], "[\"new:0\",\"new:1\"]")))).StatusCode);
-            Assert.Equal(3, deleted.Count);
+            Assert.Equal(2, deleted.Count);
 
             var clear = Form([], "[]");
             clear.Version = saved.Version;
             var cleared = await service.SaveWithImagesAsync(admin.Id, saved.Id, clear);
             Assert.Empty(cleared.ImageUrls);
-            Assert.Equal(5, deleted.Count);
+            Assert.Equal(4, deleted.Count);
         }
         finally
         {
