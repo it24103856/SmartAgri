@@ -3,13 +3,28 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from copy import deepcopy
 from typing import Literal
 from uuid import UUID
 
 import httpx
 from google import genai
 from google.genai import types
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+CATALOG = json.loads(Path(__file__).with_name("crop_catalog.json").read_text(encoding="utf-8"))
+DATASET_VERSION = CATALOG["dataset_version"]
+CROPS = CATALOG["crops"]
+
+
+def validate_crop_ids(ids):
+    if len(ids) != len(set(ids)):
+        raise ValueError("DUPLICATE_CROP_ID")
+    if any(crop_id not in CROPS for crop_id in ids):
+        raise ValueError("UNKNOWN_CROP_ID")
+    return ids
 
 
 class StrictModel(BaseModel):
@@ -84,12 +99,12 @@ class FarmAnalysisRequest(StrictModel):
         le=100,
     )
 
-    excluded_crop_ids: list[
-        Literal["chilli", "okra", "brinjal"]
-    ] = Field(
+    excluded_crop_ids: list[str] = Field(
         default_factory=list,
-        max_length=3,
+        max_length=len(CROPS),
     )
+
+    _validate_exclusions = field_validator("excluded_crop_ids")(validate_crop_ids)
 
 
 class Plan(StrictModel):
@@ -112,68 +127,18 @@ class Plan(StrictModel):
 class EvidenceSelection(StrictModel):
     crop_ids: list[str] = Field(
         min_length=1,
-        max_length=3,
+        max_length=len(CROPS),
     )
 
+    _validate_ids = field_validator("crop_ids")(validate_crop_ids)
 
-class Ranking(StrictModel):
-    crop_ids: list[str] = Field(
-        min_length=1,
-        max_length=3,
-    )
+
+class Ranking(EvidenceSelection):
+    pass
 
 
 class Review(StrictModel):
     accepted: bool
-
-
-DATASET_VERSION = "doa-starter-2026-10-01-v1"
-
-CROPS = {
-    "chilli": {
-        "name": "Chilli",
-        "source": (
-            "https://doa.gov.lk/"
-            "field-crops-chilli-si/"
-        ),
-        "temperature_c": [21, 27],
-        "elevation_max": 1600,
-        "preferred_soil": "sandy loam",
-        "planting_months": [4, 5, 10, 11],
-        "season_note": (
-            "Typical windows: April to early May; "
-            "late October to mid-November. "
-            "Month-only screening is approximate."
-        ),
-    },
-    "okra": {
-        "name": "Okra",
-        "source": (
-            "https://doa.gov.lk/"
-            "hordi-crop-okra/"
-        ),
-        "exclude_upcountry_wet": True,
-        "planting_months": [4, 5, 9, 10],
-        "season_note": (
-            "Typical windows: early April to early May; "
-            "early September to early October. "
-            "Month-only screening is approximate."
-        ),
-    },
-    "brinjal": {
-        "name": "Brinjal",
-        "source": (
-            "https://doa.gov.lk/"
-            "hordi-crop-brinjal/"
-        ),
-        "soil_ph": [5.5, 5.8],
-        "elevation_max": 1300,
-        "season_note": (
-            "This starter dataset has no "
-            "planting-month rule for brinjal."
-        ),
-    },
-}
 
 
 # Allow-listed tool 1:
@@ -182,14 +147,10 @@ def lookup_crop_requirements(crop_ids):
     if not crop_ids:
         raise ValueError("INVALID_CROP_SELECTION")
 
-    if len(crop_ids) != len(set(crop_ids)):
-        raise ValueError("INVALID_CROP_SELECTION")
-
-    if any(crop_id not in CROPS for crop_id in crop_ids):
-        raise ValueError("UNKNOWN_CROP_ID")
+    validate_crop_ids(crop_ids)
 
     return {
-        crop_id: dict(CROPS[crop_id])
+        crop_id: deepcopy(CROPS[crop_id])
         for crop_id in crop_ids
     }
 
@@ -203,8 +164,12 @@ def evaluate_conditions(request, records):
         matches = []
         conflicts = []
         unknowns = []
+        missing = []
+        environmental_matches = 0
 
-        if request.well_drained is True:
+        if crop.get("well_drained") is not True:
+            unknowns.append("No verified drainage rule in this dataset.")
+        elif request.well_drained is True:
             matches.append(
                 "Reported drainage meets the "
                 "well-drained-soil requirement."
@@ -215,6 +180,7 @@ def evaluate_conditions(request, records):
             )
         else:
             unknowns.append("Drainage is unknown.")
+            missing.append("well_drained")
 
         for field in ("temperature_c", "soil_ph"):
             bounds = crop.get(field)
@@ -226,11 +192,13 @@ def evaluate_conditions(request, records):
                     "in this dataset."
                 )
             elif value is None:
+                missing.append(field)
                 unknowns.append(
                     f"Provide {field}; "
                     f"source range is {bounds}."
                 )
             elif bounds[0] <= value <= bounds[1]:
+                environmental_matches += 1
                 matches.append(
                     f"{field}={value} is within "
                     f"source range {bounds}."
@@ -241,22 +209,25 @@ def evaluate_conditions(request, records):
                     f"source range {bounds}."
                 )
 
-        if "elevation_max" in crop:
+        if crop.get("elevation_max") is not None:
             if request.elevation_m is None:
+                missing.append("elevation_m")
                 unknowns.append("Elevation is unknown.")
             elif request.elevation_m > crop["elevation_max"]:
                 conflicts.append(
-                    "Elevation exceeds the "
-                    "source cultivation range."
+                    f"elevation_m={request.elevation_m} exceeds the source maximum {crop['elevation_max']} m."
                 )
             else:
+                environmental_matches += 1
                 matches.append(
-                    "Elevation is within the "
-                    "source cultivation range."
+                    f"elevation_m={request.elevation_m} is within the source maximum {crop['elevation_max']} m."
                 )
+        else:
+            unknowns.append("No verified elevation cutoff in this dataset.")
 
         if crop.get("exclude_upcountry_wet"):
             if request.upcountry_wet_zone is None:
+                missing.append("upcountry_wet_zone")
                 unknowns.append(
                     "Confirm whether the farm is "
                     "in the upcountry wet zone."
@@ -267,6 +238,7 @@ def evaluate_conditions(request, records):
                     "upcountry wet zone."
                 )
             else:
+                environmental_matches += 1
                 matches.append(
                     "Reported agroclimatic zone is "
                     "not excluded by the source."
@@ -281,8 +253,7 @@ def evaluate_conditions(request, records):
 
         if crop.get("preferred_soil") == soil:
             matches.append(
-                "Reported soil matches the source's "
-                "preferred sandy loam."
+                f"Reported soil={soil} matches the source's preferred texture."
             )
         else:
             unknowns.append(
@@ -290,12 +261,11 @@ def evaluate_conditions(request, records):
                 "no exact match established."
             )
 
-        months = crop.get("planting_months", [])
+        months = crop.get("planting_months") or []
 
         if request.planting_month in months:
             matches.append(
-                "Planting month overlaps a "
-                "typical planting window."
+                f"Planting month={request.planting_month} overlaps a typical window."
             )
         else:
             unknowns.append(
@@ -317,15 +287,26 @@ def evaluate_conditions(request, records):
                 "variety suitability are not assessed."
             ),
         ])
+        unknowns.extend(crop.get("evidence_notes", []))
+        if not environmental_matches:
+            unknowns.append("Insufficient evidence of environmental fit; drainage or season alone is not enough.")
+
+        eligible = not conflicts and not missing and environmental_matches > 0
 
         results[crop_id] = {
             "crop_id": crop_id,
             "name": crop["name"],
-            "eligible": not conflicts,
+            "eligible": eligible,
             "suitability": (
                 "CONDITIONAL"
-                if not conflicts
-                else "NOT_SHORTLISTED"
+                if eligible
+                else "UNSUITABLE" if conflicts else "INSUFFICIENT_EVIDENCE"
+            ),
+            "missing_fields": missing,
+            "environmental_evidence_available": (
+                any(crop.get(field) is not None for field in
+                    ("temperature_c", "soil_ph", "elevation_max"))
+                or crop.get("exclude_upcountry_wet") is True
             ),
             "reasons": matches,
             "conflicts": conflicts,
@@ -451,13 +432,6 @@ async def run_workflow(
         if crop_id not in request.excluded_crop_ids
     ]
 
-    if request.well_drained is None:
-        state.update(
-            status="NEEDS_INPUT",
-            missing_fields=["well_drained"],
-        )
-        return
-
     if not allowed:
         state.update(
             status="NO_MATCH",
@@ -549,8 +523,15 @@ async def run_workflow(
     ]
 
     if not eligible:
+        missing = sorted({
+            field for row in checks.values()
+            if not row["conflicts"] and row["environmental_evidence_available"]
+            for field in row["missing_fields"]
+        })
         state.update(
-            status="NO_MATCH",
+            status="NEEDS_INPUT" if missing else "NO_MATCH",
+            missing_fields=missing,
+            error_code="MISSING_FARM_DATA" if missing else "NO_SUITABLE_CROPS",
             validation={
                 "passed": True,
                 "eligible_crop_ids": [],
@@ -626,7 +607,7 @@ async def run_workflow(
         status="COMPLETED",
         recommendations=[
             fresh[crop_id]
-            for crop_id in ranking.crop_ids
+            for crop_id in ranking.crop_ids[:3]
         ],
         validation={
             "passed": True,
@@ -651,9 +632,11 @@ async def analyze_farm(request):
         "action_executed": False,
         "limitations": [
             (
-                "Preliminary comparison of three crops only; "
+                f"Preliminary comparison of {len(CROPS)} catalog crops; "
+                "up to three conditional recommendations; "
                 "no yield or profit prediction."
             ),
+            "Unknown rules are not inferred. Known screening inputs must be supplied; at least one environmental rule must match. Optimum ranges screen the shortlist, not absolute cultivation viability.",
             (
                 "Environmental values are caller-supplied, "
                 "not verified weather observations."
@@ -676,6 +659,10 @@ async def analyze_farm(request):
     )
 
     state["model"] = model
+
+    if set(request.excluded_crop_ids) == set(CROPS):
+        state.update(status="NO_MATCH", error_code="ALL_CROPS_EXCLUDED")
+        return state
 
     if not key or not model:
         state.update(
