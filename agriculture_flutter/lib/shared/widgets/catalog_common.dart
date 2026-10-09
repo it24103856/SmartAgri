@@ -1,10 +1,28 @@
+import 'dart:io' show SocketException;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/constants/api_constants.dart';
+import '../../core/widgets/app_glass_background.dart';
 import '../../features/auth/data/services/auth_service.dart';
 import '../../features/products/data/services/catalog_service.dart';
+
+void logCatalogImageError(String url, Object error) {
+  if (!kDebugMode) return;
+
+  final uri = Uri.tryParse(url);
+  // Never log query strings, credentials, headers or exception text, which
+  // can contain signed URLs or tokens. Keep the failure type and HTTP status.
+  final source = uri == null ? 'invalid URL' : '${uri.scheme}://${uri.host}';
+  final status = error is NetworkImageLoadException
+      ? ', HTTP ${error.statusCode}'
+      : error is SocketException
+      ? ', OS error ${error.osError?.errorCode}: ${error.osError?.message}'
+      : '';
+  debugPrint('Catalog image failed ($source): ${error.runtimeType}$status');
+}
 
 Future<void> signOutCustomer(BuildContext context) async {
   await AuthService.instance.logout();
@@ -16,22 +34,7 @@ class CatalogImage extends StatelessWidget {
   const CatalogImage(this.path, {super.key});
 
   String? get url {
-    final value = path?.trim();
-
-    if (value == null || value.isEmpty) return null;
-
-    final uri = Uri.tryParse(value);
-
-    if (uri == null) return null;
-
-    if (uri.hasScheme) {
-      return ['http', 'https'].contains(uri.scheme) ? uri.toString() : null;
-    }
-
-    // /uploads/products/image.jpg resolves against the API server.
-    return Uri.parse(
-      ApiConstants.baseUrl,
-    ).resolve('/${value.replaceFirst(RegExp(r'^/+'), '')}').toString();
+    return ApiConstants.mediaUrl(path);
   }
 
   @override
@@ -56,7 +59,11 @@ class CatalogImage extends StatelessWidget {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (_, error, stackTrace) => fallback,
+              webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+              errorBuilder: (_, error, stackTrace) {
+                logCatalogImageError(imageUrl, error);
+                return fallback;
+              },
               loadingBuilder: (_, child, progress) {
                 if (progress == null) return child;
 
@@ -129,22 +136,7 @@ class GlassCatalogBackground extends StatelessWidget {
   const GlassCatalogBackground({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF152E27), Color(0xFF15231F), Color(0xFF24251E)]
-              : const [Color(0xFFD5EDE2), Color(0xFFF5F4E9), Color(0xFFFFEAD8)],
-          stops: const [0, 0.5, 1],
-        ),
-      ),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => AppGlassBackground(child: child);
 }
 
 /// Clipped blur keeps the glass effect inside each shopping card.

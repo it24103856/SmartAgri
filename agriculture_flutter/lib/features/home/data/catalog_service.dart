@@ -3,12 +3,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
 
 String? catalogImageUrl(String? path) {
-  if (path == null || path.isEmpty) return null;
-  final base = Uri.parse(ApiConstants.baseUrl);
-  final uri = base.resolve(path);
-  if (uri.scheme != 'http' && uri.scheme != 'https') return null;
-  // Uploaded image paths resolve against the same host as the API.
-  return uri.toString();
+  return ApiConstants.mediaUrl(path);
 }
 
 class CatalogCategory {
@@ -36,9 +31,11 @@ class CatalogProduct {
       description = json['description'] as String?,
       price = (json['price'] as num).toDouble(),
       imageUrl = catalogImageUrl(
-        (json['imageUrls'] as List?)?.isNotEmpty == true
-            ? (json['imageUrls'] as List).first as String
-            : json['imageUrl'] as String?,
+        (json['imageUrl'] != null && json['imageUrl'].toString().startsWith('http')) 
+            ? json['imageUrl'] as String 
+            : ((json['imageUrls'] as List?)?.isNotEmpty == true 
+                ? (json['imageUrls'] as List).first as String 
+                : json['imageUrl'] as String?),
       ),
       assert((json['price'] as num) >= 0);
 }

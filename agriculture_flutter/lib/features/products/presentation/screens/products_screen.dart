@@ -644,7 +644,10 @@ class _MarketProductCardState extends State<_MarketProductCard> {
     return Image.network(
       url,
       fit: BoxFit.contain,
-      errorBuilder: (_, error, stackTrace) => fallback,
+      errorBuilder: (_, error, stackTrace) {
+        logCatalogImageError(url, error);
+        return fallback;
+      },
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
 

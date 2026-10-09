@@ -213,7 +213,7 @@ class _PurchasePaymentScreenState extends State<PurchasePaymentScreen>
               const SizedBox(height: 26),
 
               Card(
-                color: Colors.white,
+                color: Theme.of(context).cardTheme.color,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: DefaultTextStyle(
