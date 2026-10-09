@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using SmartAgri.Api.Services;
 
 namespace SmartAgri.Api.DTOs;
 
@@ -37,7 +38,6 @@ public sealed class CreateFarmAnalysisDto : IValidatableObject
     public decimal? HumidityPercent { get; set; }
 
     [Required]
-    [MaxLength(3)]
     public string[] ExcludedCropIds { get; set; } =
         Array.Empty<string>();
 
@@ -59,10 +59,7 @@ public sealed class CreateFarmAnalysisDto : IValidatableObject
                 new[] { nameof(Objective) });
         }
 
-        var allowed = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "chilli", "okra", "brinjal"
-        };
+        var allowed = FarmCropCatalog.Ids;
 
         if (ExcludedCropIds is not null &&
             (ExcludedCropIds.Any(id =>
@@ -71,7 +68,7 @@ public sealed class CreateFarmAnalysisDto : IValidatableObject
                 ExcludedCropIds.Length))
         {
             yield return new ValidationResult(
-                "Use unique crop IDs: chilli, okra, brinjal.",
+                "Use unique crop IDs from the Farm AI catalog.",
                 new[] { nameof(ExcludedCropIds) });
         }
     }

@@ -177,7 +177,7 @@ public partial class ProductService : IProductService{
         }
         catch
         {
-            _images.DeleteFiles(newImages);
+            await _images.DeleteFilesAsync(newImages);
             throw;
         }
 
@@ -225,13 +225,13 @@ public partial class ProductService : IProductService{
         }
         catch
         {
-            _images.DeleteFiles(newImages);
+            await _images.DeleteFilesAsync(newImages);
             throw;
         }
 
         if (newImages.Count > 0)
         {
-            _images.DeleteFiles(previousImages);
+            await _images.DeleteFilesAsync(previousImages);
         }
 
         return Map(product);
@@ -253,7 +253,7 @@ public partial class ProductService : IProductService{
         await _db.SaveChangesAsync();
 
         // Remove files only after the database deletion succeeds.
-        _images.DeleteFiles(images);
+        await _images.DeleteFilesAsync(images);
     }
 
     public async Task<ProductResponseDto> ReviewAsync(

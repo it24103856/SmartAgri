@@ -19,14 +19,17 @@ public sealed partial class CustomerCheckoutService
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
     private readonly IDataProtector _protector;
+    private readonly OrderReceiptStore? _orderReceipts;
 
     public CustomerCheckoutService(
         ApplicationDbContext db,
         IConfiguration config,
-        IDataProtectionProvider protection)
+        IDataProtectionProvider protection,
+        OrderReceiptStore? orderReceipts = null)
     {
         _db = db;
         _config = config;
+        _orderReceipts = orderReceipts;
         _protector = protection.CreateProtector(
             "SmartAgri.PayHere.Checkout.v1");
     }

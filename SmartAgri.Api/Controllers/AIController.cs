@@ -40,6 +40,9 @@ public sealed class AIController : ControllerBase
         }
     }
 
+    [HttpGet("crop-catalog")]
+    public IActionResult CropCatalog() => Ok(FarmCropCatalog.Describe());
+
     [HttpPost("analyze-farm")]
     public async Task<IActionResult> Analyze(
         [FromBody] CreateFarmAnalysisDto dto)
