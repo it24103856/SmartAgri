@@ -1,0 +1,86 @@
+{
+  "dataset_version": "doa-2026-10-05-v2",
+  "verified_on": "2026-10-05",
+  "crops": {
+    "chilli": {
+      "name": "Chilli", "source": "https://doa.gov.lk/field-crops-chilli-si/",
+      "temperature_c": [21, 27], "soil_ph": null, "elevation_max": 1600,
+      "well_drained": true, "preferred_soil": "sandy loam", "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": [4, 5, 10, 11],
+      "season_note": "Typical windows overlap April/early May and late October/mid-November; controlled conditions may permit year-round cultivation. Months are approximate, not exclusion rules.",
+      "evidence_notes": ["Climate and soil sections support temperature, elevation and drainage screening. Annual rainfed rainfall guidance cannot be compared with monthly rainfall."]
+    },
+    "okra": {
+      "name": "Okra", "source": "https://doa.gov.lk/hordi-crop-okra/",
+      "temperature_c": null, "soil_ph": null, "elevation_max": null,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": true,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": [4, 5, 9, 10],
+      "season_note": "Typical windows overlap early April/early May and early September/early October. Months are approximate; local confirmation is required.",
+      "evidence_notes": ["Climate section excludes the upcountry wet zone. Soil section requires drainage but supplies no numerical pH bounds."]
+    },
+    "brinjal": {
+      "name": "Brinjal", "source": "https://doa.gov.lk/hordi-crop-brinjal/",
+      "temperature_c": null, "soil_ph": [5.5, 5.8], "elevation_max": 1300,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Planting-month guidance is unknown in this catalog.",
+      "evidence_notes": ["Climate and soil sections verified through DOA indexed page text after direct fetch timeouts."]
+    },
+    "tomato": {
+      "name": "Tomato", "source": "https://doa.gov.lk/hordi-crop-tomato/",
+      "temperature_c": [21, 24], "soil_ph": [5.5, 7.5], "elevation_max": null,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": true,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Source nursery dates are not encoded as field planting months.",
+      "evidence_notes": ["Temperature and pH are optimum ranges used for conservative shortlist screening, not absolute survival limits. Source optimum elevation of 1000-2000 m is not a cultivation cutoff; introduction permits most zones except upcountry wet. Land preparation calls for drains to prevent retention."]
+    },
+    "cabbage": {
+      "name": "Cabbage", "source": "https://doa.gov.lk/hordi-crop-cabbage/",
+      "temperature_c": null, "soil_ph": [6, 6.5], "elevation_max": null,
+      "well_drained": true, "preferred_soil": "loam", "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Planting-month guidance is unknown in this catalog.",
+      "evidence_notes": ["Best pH range is used for conservative screening. Cool climate is qualitative; heat-tolerant varieties may suit the dry zone. No temperature cutoff is inferred."]
+    },
+    "carrot": {
+      "name": "Carrot", "source": "https://doa.gov.lk/hordi-crop-carrot/",
+      "temperature_c": null, "soil_ph": null, "elevation_max": null,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Planting-month guidance is unknown in this catalog.",
+      "evidence_notes": ["Source describes cool upcountry conditions and cultivation in all zones, without numerical screening bounds. Drainage alone is insufficient to establish a farm-specific environmental fit."]
+    },
+    "pumpkin": {
+      "name": "Pumpkin", "source": "https://doa.gov.lk/hordi-crop-pumpkin/",
+      "temperature_c": null, "soil_ph": [5.5, 7.5], "elevation_max": null,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Source describes Yala pumpkin cultivation; zone-dependent seasons are not converted to universal months.",
+      "evidence_notes": ["The source's 500 m elevation guidance applies to dry and intermediate zones; these zones are not supplied by this request, so no universal elevation cutoff is encoded. Confirm the zone locally. Irrigation section requires drains and avoiding submerged vines."]
+    },
+    "bitter_gourd": {
+      "name": "Bitter Gourd", "source": "https://doa.gov.lk/hordi-crop-bitter-gourd/",
+      "temperature_c": null, "soil_ph": [5.5, 7.5], "elevation_max": null,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": [4, 5, 10, 11],
+      "season_note": "Typical Yala months April/May and Maha months October/November; suitable areas may permit year-round cultivation.",
+      "evidence_notes": ["Soil section supplies pH and drainage. Elevation wording is ambiguous and is deliberately not encoded as a maximum."]
+    },
+    "luffa": {
+      "name": "Luffa", "source": "https://doa.gov.lk/hordi-crop-luffa/",
+      "temperature_c": null, "soil_ph": [5.5, 7.5], "elevation_max": 500,
+      "well_drained": true, "preferred_soil": "sandy loam", "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Wet-zone cultivation may be year-round; dry-zone Yala requires irrigation. No universal month rule is encoded.",
+      "evidence_notes": ["Climate and soil sections support elevation, pH and drainage. Hot weather is qualitative and has no numerical cutoff."]
+    },
+    "snake_gourd": {
+      "name": "Snake Gourd", "source": "https://doa.gov.lk/hordi-crop-snake-gourd/",
+      "temperature_c": null, "soil_ph": [5.5, 7.5], "elevation_max": 500,
+      "well_drained": true, "preferred_soil": null, "exclude_upcountry_wet": null,
+      "rainfall_mm_month": null, "humidity_percent": null, "planting_months": null,
+      "season_note": "Source describes dry-zone Yala and wet-zone year-round cultivation. No universal month rule is encoded.",
+      "evidence_notes": ["Climate and soil sections support elevation, pH and drainage. High temperature preference has no numerical bounds."]
+    }
+  }
+}
