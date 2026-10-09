@@ -14,12 +14,20 @@ Future<bool?> showFarmerPackageBooking(BuildContext context, Package package) =>
     showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       useSafeArea: true,
-      builder: (_) => FarmerPage(child: _BookingSheet(package: package)),
+      builder: (_) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: FarmerGlassBackground(
+          child: Material(
+            color: Colors.transparent,
+            child: FarmerPage(child: _BookingSheet(package: package)),
+          ),
+        ),
+      ),
     );
 
 class PackagesScreen extends StatefulWidget {
@@ -280,6 +288,7 @@ class _PackageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => FarmerGlassCard(
+    emphasized: true,
     margin: const EdgeInsets.only(bottom: 18),
     child: InkWell(
       onTap: onTap,

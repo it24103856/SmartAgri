@@ -32,6 +32,7 @@ class PackageCoverImage extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       fit: BoxFit.cover,
+      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
       semanticLabel: package.name,
       errorBuilder: (_, error, stackTrace) => fallback,
       loadingBuilder: (_, child, progress) =>
