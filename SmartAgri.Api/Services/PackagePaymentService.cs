@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using SmartAgri.Api.Data;
@@ -11,16 +14,25 @@ public sealed class PackagePaymentService
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
     private readonly string _receiptRoot;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<PackagePaymentService> _logger;
+
+    // Identifies new Supabase receipts in the existing database column.
+    private const string CloudPrefix = "supabase/";
 
     public PackagePaymentService(
         ApplicationDbContext db,
         IConfiguration config,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        IHttpClientFactory httpClientFactory,
+        ILogger<PackagePaymentService> logger)
     {
         _db = db;
         _config = config;
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
 
-        // Outside wwwroot and the public uploads directories.
+        // Keep this directory for existing local receipts.
         _receiptRoot = Path.GetFullPath(Path.Combine(
             environment.ContentRootPath,
             "..",
@@ -28,6 +40,171 @@ public sealed class PackagePaymentService
             "package-receipts"));
 
         Directory.CreateDirectory(_receiptRoot);
+    }
+
+    private string StorageSetting(string name)
+    {
+        var value = _config[$"Supabase:{name}"];
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"Missing configuration: Supabase:{name}");
+        }
+
+        return value.Trim();
+    }
+
+    private string StorageRoot()
+    {
+        var url = StorageSetting("Url").TrimEnd('/');
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || uri.AbsolutePath != "/"
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            throw new InvalidOperationException(
+                "Supabase:Url must be the HTTPS project URL.");
+        }
+
+        return $"{url}/storage/v1";
+    }
+
+    private HttpRequestMessage StorageRequest(
+        HttpMethod method,
+        string relativePath)
+    {
+        var request = new HttpRequestMessage(
+            method,
+            $"{StorageRoot()}/{relativePath}");
+
+        var key = StorageSetting("ServiceRoleKey");
+
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue("Bearer", key);
+
+        request.Headers.Add("apikey", key);
+
+        return request;
+    }
+
+    private static bool SafeReceiptName(string name)
+    {
+        if (name.Length is not 36 and not 37)
+            return false;
+
+        return Guid.TryParseExact(name[..32], "N", out _)
+            && name[32..] is ".jpg" or ".png" or ".webp";
+    }
+
+    private static string ReceiptContentType(string name) =>
+        Path.GetExtension(name) switch
+        {
+            ".jpg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => throw new PackageOperationException(
+                400, "Invalid receipt.")
+        };
+
+    private async Task<string> UploadReceipt(
+        string name,
+        byte[] bytes)
+    {
+        var bucket = Uri.EscapeDataString(
+            StorageSetting("PackageReceiptBucket"));
+
+        using var client =
+            _httpClientFactory.CreateClient("SupabaseStorage");
+
+        using var request = StorageRequest(
+            HttpMethod.Post,
+            $"object/{bucket}/{name}");
+
+        request.Headers.TryAddWithoutValidation("x-upsert", "false");
+
+        request.Content = new ByteArrayContent(bytes);
+        request.Content.Headers.ContentType =
+            new MediaTypeHeaderValue(ReceiptContentType(name));
+
+        var storedName = CloudPrefix + name;
+
+        try
+        {
+            using var response = await client.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Receipt upload failed with HTTP {StatusCode}",
+                    (int)response.StatusCode);
+
+                throw new PackageOperationException(
+                    502, "Receipt upload failed. Please try again.");
+            }
+
+            return storedName;
+        }
+        catch (Exception exception)
+        {
+            // Best-effort cleanup if the upload response was lost.
+            await TryDeleteAsync(storedName);
+
+            if (exception is HttpRequestException
+                or OperationCanceledException)
+            {
+                throw new PackageOperationException(
+                    502, "Receipt storage is unavailable. Please try again.");
+            }
+
+            throw;
+        }
+    }
+
+    private async Task<byte[]> DownloadReceipt(string name)
+    {
+        var bucket = Uri.EscapeDataString(
+            StorageSetting("PackageReceiptBucket"));
+
+        using var client =
+            _httpClientFactory.CreateClient("SupabaseStorage");
+
+        using var request = StorageRequest(
+            HttpMethod.Get,
+            $"object/authenticated/{bucket}/{name}");
+
+        try
+        {
+            using var response = await client.SendAsync(request);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new PackageOperationException(
+                    404, "Receipt file not found.");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Receipt download failed with HTTP {StatusCode}",
+                    (int)response.StatusCode);
+
+                throw new PackageOperationException(
+                    502, "Could not load the receipt. Please try again.");
+            }
+
+            return await response.Content.ReadAsByteArrayAsync();
+        }
+        catch (Exception exception)
+            when (exception is HttpRequestException
+                or OperationCanceledException)
+        {
+            throw new PackageOperationException(
+                502, "Receipt storage is unavailable. Please try again.");
+        }
     }
 
     private async Task<User> Actor(ClaimsPrincipal principal)
@@ -175,29 +352,79 @@ public sealed class PackagePaymentService
                 400, "Only JPG, PNG and WebP receipts are supported.");
 
         var name = Guid.NewGuid().ToString("N") + extension;
-        var path = Path.Combine(_receiptRoot, name);
 
-        try
-        {
-            await File.WriteAllBytesAsync(path, bytes);
-        }
-        catch
-        {
-            TryDelete(name);
-            throw;
-        }
-
-        return name;
+        return await UploadReceipt(name, bytes);
     }
 
-    private void TryDelete(string name)
+    private async Task TryDeleteAsync(string storedName)
     {
+        if (string.IsNullOrWhiteSpace(storedName))
+            return;
+
+        var isCloud = storedName.StartsWith(
+            CloudPrefix,
+            StringComparison.Ordinal);
+
+        var name = isCloud
+            ? storedName[CloudPrefix.Length..]
+            : storedName;
+
+        if (!SafeReceiptName(name))
+            return;
+
+        if (!isCloud)
+        {
+            try
+            {
+                File.Delete(Path.Combine(_receiptRoot, name));
+            }
+            catch (Exception exception)
+                when (exception is IOException
+                    or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(
+                    "Local receipt cleanup failed: {FailureType}",
+                    exception.GetType().Name);
+            }
+
+            return;
+        }
+
         try
         {
-            File.Delete(Path.Combine(_receiptRoot, Path.GetFileName(name)));
+            var bucket = Uri.EscapeDataString(
+                StorageSetting("PackageReceiptBucket"));
+
+            using var client =
+                _httpClientFactory.CreateClient("SupabaseStorage");
+
+            using var request = StorageRequest(
+                HttpMethod.Delete,
+                $"object/{bucket}");
+
+            request.Content = JsonContent.Create(new
+            {
+                prefixes = new[] { name }
+            });
+
+            using var response = await client.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode
+                && response.StatusCode != HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning(
+                    "Receipt cleanup failed with HTTP {StatusCode}",
+                    (int)response.StatusCode);
+            }
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        catch (Exception exception)
+            when (exception is HttpRequestException
+                or OperationCanceledException)
+        {
+            _logger.LogWarning(
+                "Cloud receipt cleanup failed: {FailureType}",
+                exception.GetType().Name);
+        }
     }
 
     public async Task<object> Submit(
@@ -255,7 +482,7 @@ public sealed class PackagePaymentService
         }
         catch
         {
-            TryDelete(filename);
+            await TryDeleteAsync(filename);
             throw;
         }
 
@@ -273,8 +500,7 @@ public sealed class PackagePaymentService
             .Include(p => p.Booking).ThenInclude(b => b.Farmer)
             .Include(p => p.Booking).ThenInclude(b => b.Package)
             .AsNoTracking()
-            .Where(p => p.Status == "SUBMITTED")
-            .OrderBy(p => p.CreatedAt)
+            .OrderByDescending(p => p.CreatedAt)
             .Take(200)
             .ToListAsync();
 
@@ -372,22 +598,48 @@ public sealed class PackagePaymentService
                 p.Id == proofId &&
                 (actor.Role == "ADMIN" ||
                  p.Booking.FarmerId == actor.Id))
-            ?? throw new PackageOperationException(404, "Receipt not found.");
+            ?? throw new PackageOperationException(
+                404, "Receipt not found.");
 
-        var name = Path.GetFileName(proof.ReceiptFileName);
+        var storedName = proof.ReceiptFileName;
+
+        if (string.IsNullOrWhiteSpace(storedName))
+        {
+            throw new PackageOperationException(
+                404, "Receipt file not found.");
+        }
+
+        var isCloud = storedName.StartsWith(
+            CloudPrefix,
+            StringComparison.Ordinal);
+
+        var name = isCloud
+            ? storedName[CloudPrefix.Length..]
+            : storedName;
+
+        if (!SafeReceiptName(name))
+        {
+            throw new PackageOperationException(
+                400, "Invalid receipt.");
+        }
+
+        var contentType = ReceiptContentType(name);
+
+        if (isCloud)
+        {
+            var bytes = await DownloadReceipt(name);
+            return (bytes, contentType);
+        }
+
+        // Existing receipts remain available from the private local folder.
         var path = Path.Combine(_receiptRoot, name);
 
         if (!File.Exists(path))
-            throw new PackageOperationException(404, "Receipt file not found.");
-
-        var type = Path.GetExtension(name) switch
         {
-            ".jpg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => throw new PackageOperationException(400, "Invalid receipt.")
-        };
+            throw new PackageOperationException(
+                404, "Receipt file not found.");
+        }
 
-        return (await File.ReadAllBytesAsync(path), type);
+        return (await File.ReadAllBytesAsync(path), contentType);
     }
 }

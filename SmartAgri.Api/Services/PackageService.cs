@@ -310,15 +310,15 @@ public class PackageService : IPackageService
         }
         catch (DbUpdateConcurrencyException)
         {
-            _images.DeleteFiles(uploaded);
+         await _images.DeleteFilesAsync(uploaded);
             throw new PackageOperationException(409, "This changed elsewhere. Refresh and try again.");
         }
         catch
         {
-            _images.DeleteFiles(uploaded);
+           await _images.DeleteFilesAsync(uploaded);
             throw;
         }
-        _images.DeleteFiles(previous.Except(ordered));
+    await _images.DeleteFilesAsync(previous.Except(ordered));
         return Map(package);
     }
 
@@ -349,7 +349,8 @@ public class PackageService : IPackageService
 
         _db.Packages.Remove(package);
         await _db.SaveChangesAsync();
-        _images.DeleteFiles(JsonSerializer.Deserialize<List<string>>(package.ImageUrlsJson) ?? []);
+       await _images.DeleteFilesAsync(
+    JsonSerializer.Deserialize<List<string>>(package.ImageUrlsJson) ?? []);
     }
 
     public async Task<List<BookingResponseDto>> GetPendingBookingsAsync(int adminId)
