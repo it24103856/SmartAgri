@@ -30,6 +30,7 @@ import './ProductManagement.css';
 
 const PAGE_SIZE = 6;
 
+// Permitted unit options for product packaging and measurement
 const UNITS = [
   ['kg', 'Kilogram'],
   ['g', 'Gram'],
@@ -49,6 +50,7 @@ const apiOrigin = new URL(
   window.location.origin
 ).origin;
 
+// Resolves relative image paths against API origin into absolute media URLs
 function imageSource(path) {
   if (!path) return '';
 
@@ -63,6 +65,7 @@ function imageSource(path) {
   }
 }
 
+// Formats descriptive error messages from HTTP error responses and status codes
 function getError(error) {
   if (error.response?.status === 403) {
     return 'Only active administrators can manage products.';
@@ -83,6 +86,7 @@ function getError(error) {
   return 'The request failed. Please try again.';
 }
 
+// Renders dismissible or persistent operation feedback alert banner
 function Notice({ text, error = false }) {
   if (!text) return null;
 
@@ -97,6 +101,7 @@ function Notice({ text, error = false }) {
   );
 }
 
+// Status indicator badge displaying current review/listing state
 function StatusBadge({ status }) {
   return (
     <span className={`product-status status-${status.toLowerCase()}`}>
@@ -106,6 +111,7 @@ function StatusBadge({ status }) {
   );
 }
 
+// Accessible dialog modal component wrapping product forms and details views
 function Modal({ title, busy, onClose, children, wide = false }) {
   const ref = useRef(null);
   const titleId = useId();
