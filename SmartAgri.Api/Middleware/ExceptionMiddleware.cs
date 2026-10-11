@@ -3,6 +3,9 @@ using System.Text.Json;
 
 namespace SmartAgri.Api.Middleware;
 
+/// <summary>
+/// Global exception handling middleware that intercepts unhandled exceptions and formats consistent JSON error responses.
+/// </summary>
 public class ExceptionMiddleware
 {
     private readonly RequestDelegate _next;
@@ -14,6 +17,9 @@ public class ExceptionMiddleware
         _logger = logger;
     }
 
+    /// <summary>
+    /// Executes the middleware pipeline, catching and formatting domain or server exceptions.
+    /// </summary>
     public async Task InvokeAsync(HttpContext context)
     {
         try
@@ -38,6 +44,9 @@ public class ExceptionMiddleware
         }
     }
 
+    /// <summary>
+    /// Writes a JSON error payload containing HTTP status code and message to the response stream.
+    /// </summary>
     private static Task HandleExceptionAsync(HttpContext context, HttpStatusCode statusCode, string message)
     {
         context.Response.ContentType = "application/json";
