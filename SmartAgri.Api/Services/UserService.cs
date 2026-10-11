@@ -6,6 +6,9 @@ using SmartAgri.Api.Models;
 
 namespace SmartAgri.Api.Services;
 
+/// <summary>
+/// Service managing system users, administrative lifecycle operations, role assignments, and metrics.
+/// </summary>
 public class UserService : IUserService
 {
     private readonly ApplicationDbContext _context;
@@ -20,6 +23,9 @@ public class UserService : IUserService
         _context = context;
     }
 
+    /// <summary>
+    /// Retrieves all user records sorted by newest registration date.
+    /// </summary>
     public async Task<IEnumerable<UserResponseDto>> GetAllUsersAsync()
     {
         return await _context.Users
@@ -28,12 +34,18 @@ public class UserService : IUserService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Looks up a single user by primary key ID.
+    /// </summary>
     public async Task<UserResponseDto?> GetUserByIdAsync(int id)
     {
         var user = await _context.Users.FindAsync(id);
         return user == null ? null : MapToResponseDto(user);
     }
 
+    /// <summary>
+    /// Creates a new user with password hashing and initial active status.
+    /// </summary>
     public async Task<UserResponseDto> CreateUserAsync(CreateUserDto dto)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
@@ -60,6 +72,9 @@ public class UserService : IUserService
         return MapToResponseDto(user);
     }
 
+    /// <summary>
+    /// Updates general profile attributes of an existing user.
+    /// </summary>
     public async Task<UserResponseDto?> UpdateUserAsync(int id, UpdateUserDto dto)
     {
         var user = await _context.Users.FindAsync(id);
@@ -76,6 +91,9 @@ public class UserService : IUserService
         return MapToResponseDto(user);
     }
 
+    /// <summary>
+    /// Deletes a user record permanently by primary key ID.
+    /// </summary>
     public async Task<bool> DeleteUserAsync(int id)
     {
         var user = await _context.Users.FindAsync(id);
@@ -86,6 +104,9 @@ public class UserService : IUserService
         return true;
     }
 
+    /// <summary>
+    /// Updates the active/inactive/blocked account status of a specified user.
+    /// </summary>
     public async Task<bool> ChangeStatusAsync(int id, string newStatus)
     {
         var user = await _context.Users.FindAsync(id);
@@ -99,6 +120,9 @@ public class UserService : IUserService
     }
 
     // NEW
+    /// <summary>
+    /// Reassigns an authorized role to a user after checking allowed role whitelist.
+    /// </summary>
     public async Task<UserResponseDto?> ChangeRoleAsync(int id, string newRole)
     {
         var normalizedRole = newRole?.ToUpper() ?? "";
@@ -118,6 +142,9 @@ public class UserService : IUserService
     }
 
     // NEW
+    /// <summary>
+    /// Computes aggregated user statistics broken down by role and account status.
+    /// </summary>
     public async Task<UserStatsDto> GetStatsAsync()
     {
         var users = await _context.Users.ToListAsync();
@@ -134,6 +161,9 @@ public class UserService : IUserService
         };
     }
 
+    /// <summary>
+    /// Projects a User entity onto a UserResponseDto transfer object.
+    /// </summary>
     private static UserResponseDto MapToResponseDto(User user)
     {
         return new UserResponseDto
