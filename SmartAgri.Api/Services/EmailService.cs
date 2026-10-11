@@ -4,6 +4,9 @@ using MimeKit;
 
 namespace SmartAgri.Api.Services;
 
+/// <summary>
+/// Service responsible for delivering transactional and notification emails via SMTP.
+/// </summary>
 public sealed class EmailService
 {
     private readonly IConfiguration _configuration;
@@ -13,6 +16,9 @@ public sealed class EmailService
         _configuration = configuration;
     }
 
+    /// <summary>
+    /// Sends a plain-text email message asynchronously using configured SMTP credentials.
+    /// </summary>
     public async Task SendAsync(
         string recipient,
         string subject,
@@ -85,6 +91,9 @@ public sealed class EmailService
         }
     }
 
+    /// <summary>
+    /// Retrieves a required configuration value or throws an exception if missing.
+    /// </summary>
     private string Required(string name)
     {
         var value = _configuration[$"Email:{name}"];
