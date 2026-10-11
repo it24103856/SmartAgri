@@ -10,6 +10,9 @@ using SmartAgri.Api.Models;
 
 namespace SmartAgri.Api.Services;
 
+/// <summary>
+/// Provides authentication services including user login, registration, and JWT issuance.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly ApplicationDbContext _context;
@@ -29,6 +32,9 @@ public class AuthService : IAuthService
         _configuration = configuration;
     }
 
+    /// <summary>
+    /// Authenticates a user with email and password credentials, returning a JWT token and profile data.
+    /// </summary>
     public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
@@ -51,6 +57,9 @@ public class AuthService : IAuthService
         };
     }
 
+    /// <summary>
+    /// Registers a new user account with hashed credentials and role enforcement.
+    /// </summary>
     public async Task<UserDto> RegisterAsync(RegisterDto dto, string? profileImageUrl = null)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
@@ -84,6 +93,9 @@ public class AuthService : IAuthService
         return MapToUserDto(user);
     }
 
+    /// <summary>
+    /// Generates a signed JWT token containing standard claims and user session identifier.
+    /// </summary>
     private string GenerateJwtToken(User user)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
@@ -113,6 +125,9 @@ public class AuthService : IAuthService
         return tokenHandler.WriteToken(token);
     }
 
+    /// <summary>
+    /// Maps a User entity to a client-facing UserDto instance.
+    /// </summary>
     private static UserDto MapToUserDto(User user) => new()
     {
         Id = user.Id,
