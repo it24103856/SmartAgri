@@ -7,7 +7,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell 
 } from 'recharts';
 
-// Dummy Chart Data
+// Monthly revenue and profit dataset for analytical area chart visualization
 const salesData = [
   { month: 'Jan', revenue: 40000, profit: 24000 },
   { month: 'Feb', revenue: 55000, profit: 32000 },
@@ -17,14 +17,17 @@ const salesData = [
   { month: 'Jun', revenue: 95000, profit: 61000 },
 ];
 
+// Product category sales share distribution for pie chart representation
 const categoryData = [
   { name: 'Fertilizers', value: 45 },
   { name: 'Equipment', value: 30 },
   { name: 'Seeds', value: 25 },
 ];
 
+// Themed green palette color values for chart slices
 const COLORS = ['#2D5A40', '#4E9F6E', '#8EB89B'];
 
+// Executive dashboard overview component displaying summary KPIs, sales trends, and recent activities.
 const Dashboard = () => {
   return (
     <div className="flex-1 bg-[#F4F7F4] p-8 min-h-screen">
