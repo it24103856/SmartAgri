@@ -3,13 +3,16 @@ import { Lock, Mail, Leaf, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import api from '../../services/api';
 
+// Administrator authentication page component providing credentials verification and session persistence.
 const Login = ({ onLogin }) => {
+  // Form state for credentials, visibility toggle, and async status
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Validates credentials against the backend API and restricts access strictly to admin accounts
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
