@@ -7,6 +7,9 @@ using SmartAgri.Api.Models;
 
 namespace SmartAgri.Api.Services;
 
+/// <summary>
+/// Exception thrown when a package domain rule, state conflict, or permission check fails.
+/// </summary>
 public class PackageOperationException : Exception
 {
     public int StatusCode { get; }
@@ -18,8 +21,14 @@ public class PackageOperationException : Exception
     }
 }
 
+/// <summary>
+/// Service managing agricultural service packages, booking lifecycle, and pricing calculations.
+/// </summary>
 public class PackageService : IPackageService
 {
+    /// <summary>
+    /// Computes the current date in the Sri Lanka standard time zone (UTC+05:30).
+    /// </summary>
     private static DateOnly TodayInSriLanka()
     {
         var local = DateTimeOffset.UtcNow.ToOffset(
@@ -40,6 +49,9 @@ public class PackageService : IPackageService
 
     // ---------- shared helpers ----------
 
+    /// <summary>
+    /// Validates that the user exists, is active, and possesses the expected application role.
+    /// </summary>
     private async Task<User> RequireRoleAsync(int userId, string role)
     {
         var user = await _db.Users.FindAsync(userId);
@@ -58,6 +70,9 @@ public class PackageService : IPackageService
         return user;
     }
 
+    /// <summary>
+    /// Retrieves a package by ID including creator information, or throws a 404 exception.
+    /// </summary>
     private async Task<Package> FindPackageAsync(int id)
     {
         return await _db.Packages
@@ -75,6 +90,9 @@ public class PackageService : IPackageService
         }
     }
 
+    /// <summary>
+    /// Transforms a Package entity into a client-safe PackageResponseDto record.
+    /// </summary>
     private static PackageResponseDto Map(Package p) => new(
         p.Id,
         p.Name,
