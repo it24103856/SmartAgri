@@ -6,6 +6,9 @@ using SmartAgri.Api.Models;
 
 namespace SmartAgri.Api.Services;
 
+/// <summary>
+/// Exception representing a domain or validation error during product operations.
+/// </summary>
 public class ProductOperationException : Exception
 {
     public int StatusCode { get; }
@@ -17,6 +20,9 @@ public class ProductOperationException : Exception
     }
 }
 
+/// <summary>
+/// Service managing agricultural product catalogs, inventory validation, and administration.
+/// </summary>
 public partial class ProductService : IProductService{
     private readonly ApplicationDbContext _db;
     private readonly ProductImageStore _images;
@@ -29,6 +35,9 @@ public partial class ProductService : IProductService{
         _images = images;
     }
 
+    /// <summary>
+    /// Builds the base query for products including relational category and user navigation properties.
+    /// </summary>
     private IQueryable<Product> ProductQuery()
     {
         return _db.Products
@@ -37,6 +46,9 @@ public partial class ProductService : IProductService{
             .Include(p => p.ReviewedBy);
     }
 
+    /// <summary>
+    /// Validates that the active user exists and holds administrator privileges.
+    /// </summary>
     private async Task<User> RequireAdminAsync(int adminId)
     {
         var user = await _db.Users.FindAsync(adminId);
@@ -53,12 +65,18 @@ public partial class ProductService : IProductService{
         return user;
     }
 
+    /// <summary>
+    /// Finds a product by identifier or throws a 404 operation exception.
+    /// </summary>
     private async Task<Product> FindProductAsync(int id)
     {
         return await ProductQuery().FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new ProductOperationException(404, "Product not found.");
     }
 
+    /// <summary>
+    /// Verifies precision requirements for product financial and weight attributes and validates category existence.
+    /// </summary>
     private async Task<Category> ValidateDetailsAsync(SaveProductDto dto)
     {
         if (decimal.Round(dto.Price, 2) != dto.Price)
@@ -118,6 +136,9 @@ public partial class ProductService : IProductService{
         product.NutritionSourceUrl = dto.IsFood ? dto.NutritionSourceUrl?.Trim() : null;
     }
 
+    /// <summary>
+    /// Retrieves all products for administrative overview ordered by creation timestamp.
+    /// </summary>
     public async Task<List<ProductResponseDto>> GetAllAsync(int adminId)
     {
         await RequireAdminAsync(adminId);
@@ -130,6 +151,9 @@ public partial class ProductService : IProductService{
         return products.Select(Map).ToList();
     }
 
+    /// <summary>
+    /// Retrieves a single product by identifier with administrator authorization.
+    /// </summary>
     public async Task<ProductResponseDto> GetByIdAsync(int adminId, int id)
     {
         await RequireAdminAsync(adminId);
