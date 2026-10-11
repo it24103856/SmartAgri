@@ -4,6 +4,7 @@ import PackagePaymentReview from '../Packages/PackagePaymentReview';
 
 const PAGE_SIZE = 10;
 
+// State machine mapping defining the progression sequence of customer order statuses
 const NEXT_STATUS = {
   Confirmed: 'Preparing',
   Preparing: 'Packed',
@@ -11,6 +12,7 @@ const NEXT_STATUS = {
   Dispatched: 'Delivered',
 };
 
+// Human-readable labels mapped to system order status keys
 const STATUS_LABELS = {
   AwaitingPayment: 'Awaiting payment',
   Confirmed: 'Confirmed',
@@ -28,8 +30,10 @@ const moneyFormatter = new Intl.NumberFormat('en-LK', {
   currency: 'LKR',
 });
 
+// Formats a numeric value into Sri Lankan Rupee (LKR) currency string
 const money = (value) => moneyFormatter.format(Number(value ?? 0));
 
+// Formats an ISO datetime string into localized date and time representation
 function dateTime(value) {
   if (!value) return '—';
 
@@ -40,6 +44,7 @@ function dateTime(value) {
     : date.toLocaleString('en-LK');
 }
 
+// Extracts user-friendly error messages from API response codes and payloads
 function errorMessage(error) {
   const status = error.response?.status;
   const data = error.response?.data;
@@ -84,6 +89,7 @@ const fieldClass =
   'text-sm outline-none focus:border-[#4E9F6E] focus:ring-2 ' +
   'focus:ring-[#EAF4EE]';
 
+// Reusable notification banner for feedback and validation alerts
 function Notice({ children, error = false }) {
   if (!children) return null;
 
@@ -101,6 +107,7 @@ function Notice({ children, error = false }) {
   );
 }
 
+// Visual badge component rendering status-specific colors and labels
 function StatusBadge({ status }) {
   const tone =
     status === 'Delivered'
