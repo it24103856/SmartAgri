@@ -3,7 +3,9 @@ import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
 import '../utils/token_storage.dart';
 
+/// Central HTTP networking client built on Dio with automatic bearer token injection and session recovery.
 class ApiClient {
+  /// Private constructor configuring default Dio options, interceptors, and error handlers.
   ApiClient._internal() {
     _dio = Dio(_options());
 
@@ -85,6 +87,7 @@ class ApiClient {
     headers: {'Content-Type': 'application/json'},
   );
 
+  /// Validates the current session against the server endpoint, caching in-flight validation requests.
   Future<Map<String, dynamic>?> validateSession() async {
     final storage = TokenStorage.instance;
     final token = await storage.getToken();
@@ -112,6 +115,7 @@ class ApiClient {
     }
   }
 
+  /// Executes the session validation call and purges stored credentials if unauthorized.
   Future<Map<String, dynamic>?> _validate(String token, int version) async {
     final storage = TokenStorage.instance;
 
