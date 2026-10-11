@@ -4,7 +4,9 @@ import {
   PackageCheck, Tractor, Bot, TrendingUp, Settings, LogOut 
 } from 'lucide-react';
 
+// Navigation sidebar component rendering administrator section links and current user profile.
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
+  // Defined navigation routes and icons corresponding to administrative dashboard tabs
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'User Management', icon: Users },
