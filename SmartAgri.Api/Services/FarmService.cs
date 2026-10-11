@@ -6,6 +6,9 @@ using SmartAgri.Api.Models;
 
 namespace SmartAgri.Api.Services;
 
+/// <summary>
+/// Service handling farm profile management, images, and farmer authorization checks.
+/// </summary>
 public class FarmService : IFarmService
 {
     private readonly ApplicationDbContext _db;
@@ -22,6 +25,9 @@ public class FarmService : IFarmService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Validates that the specified user exists, possesses the farmer role, and is active.
+    /// </summary>
     private async Task EnsureFarmerExistsAsync(int farmerId)
     {
         var farmer = await _db.Users
@@ -39,6 +45,9 @@ public class FarmService : IFarmService
         }
     }
 
+    /// <summary>
+    /// Retrieves all farms belonging to the specified farmer, ordered by creation date descending.
+    /// </summary>
     public async Task<List<FarmResponseDto>> GetFarmerFarmsAsync(int farmerId)
     {
         await EnsureFarmerExistsAsync(farmerId);
@@ -52,6 +61,9 @@ public class FarmService : IFarmService
         return farms.Select(MapToDto).ToList();
     }
 
+    /// <summary>
+    /// Retrieves a specific farm by ID after verifying farmer ownership.
+    /// </summary>
     public async Task<FarmResponseDto> GetFarmerFarmByIdAsync(int farmerId, int farmId)
     {
         await EnsureFarmerExistsAsync(farmerId);
@@ -68,6 +80,9 @@ public class FarmService : IFarmService
         return MapToDto(farm);
     }
 
+    /// <summary>
+    /// Creates a new farm profile with uploaded image attachments and validation.
+    /// </summary>
     public async Task<FarmResponseDto> CreateFarmAsync(int farmerId, CreateFarmDto dto)
     {
         await EnsureFarmerExistsAsync(farmerId);
@@ -119,6 +134,9 @@ public class FarmService : IFarmService
         return MapToDto(farm);
     }
 
+    /// <summary>
+    /// Updates farm metadata and synchronizes image assets, removing decommissioned files.
+    /// </summary>
     public async Task<FarmResponseDto> UpdateFarmAsync(int farmerId, int farmId, UpdateFarmDto dto)
     {
         await EnsureFarmerExistsAsync(farmerId);
@@ -189,6 +207,9 @@ public class FarmService : IFarmService
         return MapToDto(farm);
     }
 
+    /// <summary>
+    /// Deletes a farm record and purges all associated uploaded images from storage.
+    /// </summary>
     public async Task DeleteFarmAsync(int farmerId, int farmId)
     {
         await EnsureFarmerExistsAsync(farmerId);
@@ -214,6 +235,9 @@ public class FarmService : IFarmService
         _logger.LogInformation("Farm ID {FarmId} deleted for Farmer ID {FarmerId}", farmId, farmerId);
     }
 
+    /// <summary>
+    /// Projects a Farm database model onto a FarmResponseDto data transfer object.
+    /// </summary>
     private static FarmResponseDto MapToDto(Farm farm)
     {
         return new FarmResponseDto
