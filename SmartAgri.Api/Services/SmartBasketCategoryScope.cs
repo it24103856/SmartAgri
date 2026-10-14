@@ -29,4 +29,20 @@ public static class SmartBasketCategoryScope
             "This basket has an invalid category scope.",
             409);
     }
+
+    public static bool ReadFoodOnly(JsonElement constraints)
+    {
+        if (!constraints.TryGetProperty("foodOnly", out var value))
+            return true;
+
+        if (value.ValueKind == JsonValueKind.True ||
+            value.ValueKind == JsonValueKind.False)
+        {
+            return value.GetBoolean();
+        }
+
+        throw new BadHttpRequestException(
+            "This basket has an invalid food scope.",
+            409);
+    }
 }

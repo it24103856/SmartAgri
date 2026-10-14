@@ -60,7 +60,8 @@ public sealed class SmartBasketService
         "0.00",
         CultureInfo.InvariantCulture),
     currency = "LKR",
-    categoryId = request.CategoryId
+    categoryId = request.CategoryId,
+    foodOnly = request.FoodOnly
 });
 
         var hash = Convert.ToHexString(
@@ -99,7 +100,8 @@ public sealed class SmartBasketService
             ConstraintsJson = JsonSerializer.Serialize(new
 {
     categoryId = request.CategoryId,
-    excludedProductIds = Array.Empty<int>()
+            excludedProductIds = Array.Empty<int>(),
+            foodOnly = request.FoodOnly
 }),
             PlanJson = "{}",
             ValidationJson = "{}",
@@ -485,6 +487,7 @@ public sealed class SmartBasketService
 
         var snapshots = ReadAddableProducts(root);
         var categoryId = SmartBasketCategoryScope.Read(root);
+        var foodOnly = SmartBasketCategoryScope.ReadFoodOnly(root);
 
         var excludedIds = root.TryGetProperty(
                 "excludedProductIds", out var exclusions)
@@ -499,7 +502,7 @@ public sealed class SmartBasketService
             .Where(product =>
                 allowedIds.Contains(product.Id) &&
                 !excludedIds.Contains(product.Id) &&
-                product.IsFood &&
+                (!foodOnly || product.IsFood) &&
                 (product.IsActive && product.Status == "APPROVED") &&
                 product.StockQuantity > 0 &&
                 product.Price > 0 &&
@@ -624,6 +627,8 @@ public sealed class SmartBasketService
 
     var categoryId = SmartBasketCategoryScope.Read(
         constraints.RootElement);
+    var foodOnly = SmartBasketCategoryScope.ReadFoodOnly(
+        constraints.RootElement);
 
     var excludedIds = new HashSet<int>();
 
@@ -646,7 +651,7 @@ public sealed class SmartBasketService
     foreach (var line in request.Items)
     {
         if (!products.TryGetValue(line.ProductId, out var product) ||
-            !product.IsFood ||
+            (foodOnly && !product.IsFood) ||
             (categoryId.HasValue &&
              product.CategoryId != categoryId.Value) ||
             (!product.IsActive || product.Status != "APPROVED") ||

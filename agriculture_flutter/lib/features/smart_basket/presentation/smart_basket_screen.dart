@@ -44,6 +44,7 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
 
   // 0 is a UI-only value for all food categories.
   int _categoryId = 0;
+  bool _foodOnly = true;
   int _page = 1;
   int _total = 0;
 
@@ -195,6 +196,7 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
             ? null
             : double.parse(_budget.text.trim()),
         'categoryId': _categoryId == 0 ? null : _categoryId,
+        'foodOnly': _foodOnly,
       };
     }
 
@@ -310,15 +312,15 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
                     initialValue: _categoryId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Food category',
+                      labelText: 'Product category',
                       prefixIcon: Icon(Icons.eco_outlined),
-                      helperText: 'Choose all food categories or one category.',
+                      helperText: 'Choose all categories or one category.',
                       border: OutlineInputBorder(),
                     ),
                     items: [
                       const DropdownMenuItem<int>(
                         value: 0,
-                        child: Text('All food categories'),
+                        child: Text('All categories'),
                       ),
                       for (final category in _categories)
                         DropdownMenuItem<int>(
@@ -339,6 +341,20 @@ class _SmartBasketScreenState extends State<SmartBasketScreen> {
                         value == null ? 'Select a category.' : null,
                   ),
                   const SizedBox(height: 16),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Food products only'),
+                    subtitle: Text(
+                      _foodOnly
+                          ? 'Only food products will be considered.'
+                          : 'Approved non-food products may also be included.',
+                    ),
+                    value: _foodOnly,
+                    onChanged: locked || _loading
+                        ? null
+                        : (value) => setState(() => _foodOnly = value),
+                  ),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _objective,
                     enabled: !locked,

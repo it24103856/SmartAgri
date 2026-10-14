@@ -328,6 +328,8 @@ public sealed class AdminSmartBasketService
 
         var categoryId = SmartBasketCategoryScope.Read(
             constraints.RootElement);
+        var foodOnly = SmartBasketCategoryScope.ReadFoodOnly(
+            constraints.RootElement);
 
         var excludedIds = new HashSet<int>();
 
@@ -363,7 +365,7 @@ public sealed class AdminSmartBasketService
         foreach (var item in items)
         {
             if (!products.TryGetValue(item.ProductId, out var product) ||
-                !product.IsFood ||
+                (foodOnly && !product.IsFood) ||
                 (!product.IsActive || product.Status != "APPROVED") ||
                 (categoryId.HasValue &&
                  product.CategoryId != categoryId.Value) ||

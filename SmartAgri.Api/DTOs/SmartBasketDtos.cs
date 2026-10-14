@@ -8,6 +8,9 @@ public sealed class CreateSmartBasketRequest : IValidatableObject
     // null = all food categories; positive ID = one category.
     [Range(1, int.MaxValue)]
     public int? CategoryId { get; set; }
+
+    // Defaults to food-only; customers may opt in to approved non-food products.
+    public bool FoodOnly { get; set; } = true;
     public Guid RequestId { get; set; }
 
     [Required]
