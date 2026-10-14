@@ -123,6 +123,19 @@ class ProposalRejected(Exception):
 
 
 FALLBACK_LIST_REQUIRED = "Local fallback needs a simple shopping list."
+_SCHEMA_DROP_KEYS = {
+    "default",
+    "title",
+    "minLength",
+    "maxLength",
+    "additionalProperties",
+    "maxItems",
+    "minItems",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+}
 
 # Name aliases only: IDs, prices, stock and selling units always come from
 # the supplied catalog. Do not use fuzzy matching to guess another product.
@@ -556,30 +569,16 @@ async def ask_model(client, role, instruction, payload, output_type):
 
     def clean_schema(value):
         if isinstance(value, dict):
-            for k, v in list(value.items()):
-                if k in ("default", "title", "minLength", "maxLength", "additionalProperties"):
-                    value.pop(k, None)
-                elif k == "exclusiveMinimum" and value.get("type") == "integer":
-                    value["minimum"] = v + 1
-                    value.pop(k, None)
-                elif k == "exclusiveMaximum" and value.get("type") == "integer":
-                    value["maximum"] = v - 1
-                    value.pop(k, None)
+            for key in list(value):
+                if key in _SCHEMA_DROP_KEYS:
+                    value.pop(key)
                 else:
-                    clean_schema(v)
+                    clean_schema(value[key])
         elif isinstance(value, list):
             for item in value:
                 clean_schema(item)
 
     clean_schema(output_schema)
-
-    if output_type is CatalogSelection:
-        catalog = payload.get("catalog") if isinstance(payload, dict) else None
-        if not catalog:
-            properties = output_schema.get("properties", {})
-            for field in ("eligible_product_ids", "excluded_product_ids", "required_items"):
-                if field in properties:
-                    properties[field]["maxItems"] = 0
 
     if output_type is CatalogSelection:
         print("\n===== CATALOG OUTPUT SCHEMA =====")

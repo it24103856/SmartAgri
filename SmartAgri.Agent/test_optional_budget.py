@@ -101,13 +101,27 @@ class PartialProposalTests(unittest.IsolatedAsyncioTestCase):
                 schema = json.loads(json.dumps(config.response_json_schema))
                 self.assertEqual(schema["properties"]["eligible_product_ids"]["items"]["type"], "integer")
                 self.assertNotIn("default", schema["properties"]["fixed_list"])
+                def assert_provider_schema(value):
+                    if isinstance(value, dict):
+                        for key, child in value.items():
+                            self.assertNotIn(
+                                key,
+                                {
+                                    "default", "title", "minLength", "maxLength",
+                                    "additionalProperties", "maxItems", "minItems",
+                                    "minimum", "maximum", "exclusiveMinimum",
+                                    "exclusiveMaximum",
+                                },
+                            )
+                            assert_provider_schema(child)
+                    elif isinstance(value, list):
+                        for child in value:
+                            assert_provider_schema(child)
+
+                assert_provider_schema(schema)
                 if products:
                     self.assertNotIn("enum", schema["properties"]["eligible_product_ids"]["items"])
                     self.assertNotIn("enum", schema["$defs"]["RequiredItem"]["properties"]["product_id"])
-                    self.assertEqual(schema["$defs"]["RequiredItem"]["properties"]["product_id"]["minimum"], 1)
-                else:
-                    self.assertEqual(schema["properties"]["eligible_product_ids"]["maxItems"], 0)
-                    self.assertEqual(schema["properties"]["required_items"]["maxItems"], 0)
                 return SimpleNamespace(text=selected.model_dump_json())
 
             client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
