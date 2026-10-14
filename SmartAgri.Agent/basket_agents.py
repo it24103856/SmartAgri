@@ -330,11 +330,21 @@ def _local_review(payload):
 
     if "basket" in payload:
         basket = payload["basket"]
+        try:
+            basket_items = [
+                BasketLine(
+                    product_id=item["product_id"],
+                    quantity=item["quantity"],
+                )
+                for item in basket.get("items", [])
+            ]
+        except (KeyError, TypeError, ValidationError):
+            return BasketReview(accepted=False, issues=["Basket contains invalid items."])
         checked = validate_basket(BasketValidationRequest(
             workflow_id=basket["workflow_id"], budget_minor=payload.get("budget_minor"),
             currency=basket["currency"], products=payload["catalog"],
             excluded_product_ids=expected.excluded_product_ids,
-            items=[BasketLine(product_id=i.product_id, quantity=i.quantity) for i in expected.required_items],
+            items=basket_items,
         ))
         checked_data = checked.model_dump(mode="json")
         if (not checked.valid or basket.get("valid") is not True or

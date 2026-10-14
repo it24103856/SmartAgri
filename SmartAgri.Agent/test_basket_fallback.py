@@ -164,6 +164,30 @@ class LocalFallbackTests(unittest.TestCase):
         request["budget_minor"] = 99
         self.assertFalse(local_fallback(request, BasketReview).accepted)
 
+    def test_local_review_validates_generated_mixed_basket(self):
+        products = [
+            product(1, "Apple", 50000, "pack", 3, category_name="Fruits"),
+            product(2, "Tomatoes", 28000, "kg", 10, category_name="Vegetables"),
+        ]
+        request = payload("mix bucket", products)
+        request["budget_minor"] = 100000
+        selection = local_fallback(request, CatalogSelection)
+        request["selection"] = selection.model_dump()
+        request["basket"] = validate_basket(BasketValidationRequest(
+            workflow_id=uuid4(),
+            budget_minor=request["budget_minor"],
+            products=request["catalog"],
+            items=[
+                {"product_id": 1, "quantity": 1},
+                {"product_id": 2, "quantity": 1},
+            ],
+        )).model_dump(mode="json")
+
+        review = local_fallback(request, BasketReview)
+
+        self.assertTrue(review.accepted)
+        self.assertEqual(review.issues, [])
+
 
 class ProviderFallbackTests(unittest.IsolatedAsyncioTestCase):
     async def test_reported_trailing_comma_request_succeeds_after_503(self):
