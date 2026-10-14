@@ -23,27 +23,8 @@ public sealed class CustomerOrderAccessTests
     [Fact]
     public async Task Customer_cannot_read_another_customers_order()
     {
-        var password = Environment.GetEnvironmentVariable(
-            "SMARTAGRI_TEST_DB_PASSWORD");
-
-        Assert.False(
-            string.IsNullOrWhiteSpace(password),
-            "Set SMARTAGRI_TEST_DB_PASSWORD before running this test.");
-
-        var databaseName = $"smartagri_test_{Guid.NewGuid():N}";
-
-        var connectionString = new NpgsqlConnectionStringBuilder
-        {
-            Host = "localhost",
-            Port = 5432,
-            Database = databaseName,
-            Username = Environment.GetEnvironmentVariable(
-                "SMARTAGRI_TEST_DB_USER") ?? "postgres",
-            Password = password!,
-            Pooling = false,
-            Timeout = 10,
-            CommandTimeout = 30
-        }.ConnectionString;
+        await using var database = await SupabaseTestDatabase.CreateAsync();
+        var connectionString = database.ConnectionString;
 
         ApplicationDbContext NewDb(bool failSave = false)
         {
@@ -68,7 +49,7 @@ public sealed class CustomerOrderAccessTests
 
         try
         {
-            await setup.Database.EnsureCreatedAsync();
+            await database.InitializeAsync(setup);
 
             var customerA = new User
             {
@@ -307,7 +288,6 @@ public sealed class CustomerOrderAccessTests
         finally
         {
             // Delete only this test run's generated database.
-            await setup.Database.EnsureDeletedAsync();
         }
     }
 }

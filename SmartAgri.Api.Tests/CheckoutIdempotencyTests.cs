@@ -15,28 +15,8 @@ public sealed class CheckoutIdempotencyTests
     [Fact]
     public async Task Same_request_does_not_create_duplicate_order()
     {
-        var password = Environment.GetEnvironmentVariable(
-            "SMARTAGRI_TEST_DB_PASSWORD");
-
-        Assert.False(
-            string.IsNullOrWhiteSpace(password),
-            "Set SMARTAGRI_TEST_DB_PASSWORD before running this test.");
-
-        // Each run uses its own temporary database.
-        var databaseName = $"smartagri_test_{Guid.NewGuid():N}";
-
-        var connectionString = new NpgsqlConnectionStringBuilder
-        {
-            Host = "localhost",
-            Port = 5432,
-            Database = databaseName,
-            Username = Environment.GetEnvironmentVariable(
-                "SMARTAGRI_TEST_DB_USER") ?? "postgres",
-            Password = password!,
-            Pooling = false,
-            Timeout = 10,
-            CommandTimeout = 30
-        }.ConnectionString;
+        await using var database = await SupabaseTestDatabase.CreateAsync();
+        var connectionString = database.ConnectionString;
 
         ApplicationDbContext NewDb()
         {
@@ -52,7 +32,7 @@ public sealed class CheckoutIdempotencyTests
 
         try
         {
-            await setup.Database.EnsureCreatedAsync();
+            await database.InitializeAsync(setup);
 
             var customer = new User
             {
@@ -194,10 +174,6 @@ public sealed class CheckoutIdempotencyTests
                 1,
                 await verify.CustomerPayments.CountAsync());
         }
-        finally
-        {
-            // Only this run's temporary database is deleted.
-            await setup.Database.EnsureDeletedAsync();
-        }
+        finally { }
     }
 }

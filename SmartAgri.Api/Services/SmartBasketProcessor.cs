@@ -573,7 +573,14 @@ public sealed class SmartBasketProcessor
                 FinishedAt = DateTime.UtcNow,
                 OutputJson = JsonSerializer.Serialize(new
                 {
-                    reportedStatus = stepStatus
+                    reportedStatus = stepStatus,
+                    category = agent switch
+                    {
+                        "Planner" or "CatalogAgent" => "Analysis",
+                        "BasketAgent" => "Action",
+                        "Validator" or "ReviewAgent" => "Validation",
+                        _ => "Unknown"
+                    }
                 })
             });
         }

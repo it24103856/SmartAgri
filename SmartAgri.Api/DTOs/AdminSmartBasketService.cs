@@ -115,6 +115,15 @@ public sealed class AdminSmartBasketService
                 step.Attempt,
                 step.Sequence,
                 step.AgentName,
+                category = step.AgentName == "Planner" ||
+                    step.AgentName == "CatalogAgent"
+                    ? "Analysis"
+                    : step.AgentName == "BasketAgent"
+                        ? "Action"
+                        : step.AgentName == "Validator" ||
+                            step.AgentName == "ReviewAgent"
+                            ? "Validation"
+                            : "System",
                 step.ToolName,
                 step.Status,
                 step.StartedAt,

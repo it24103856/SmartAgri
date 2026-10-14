@@ -16,27 +16,8 @@ public sealed class CheckoutPriceChangeTests
     [Fact]
     public async Task Changed_price_rejects_checkout_without_changing_stock()
     {
-        var password = Environment.GetEnvironmentVariable(
-            "SMARTAGRI_TEST_DB_PASSWORD");
-
-        Assert.False(
-            string.IsNullOrWhiteSpace(password),
-            "Set SMARTAGRI_TEST_DB_PASSWORD before running this test.");
-
-        var databaseName = $"smartagri_test_{Guid.NewGuid():N}";
-
-        var connectionString = new NpgsqlConnectionStringBuilder
-        {
-            Host = "localhost",
-            Port = 5432,
-            Database = databaseName,
-            Username = Environment.GetEnvironmentVariable(
-                "SMARTAGRI_TEST_DB_USER") ?? "postgres",
-            Password = password!,
-            Pooling = false,
-            Timeout = 10,
-            CommandTimeout = 30
-        }.ConnectionString;
+        await using var database = await SupabaseTestDatabase.CreateAsync();
+        var connectionString = database.ConnectionString;
 
         ApplicationDbContext NewDb()
         {
@@ -52,7 +33,7 @@ public sealed class CheckoutPriceChangeTests
 
         try
         {
-            await setup.Database.EnsureCreatedAsync();
+            await database.InitializeAsync(setup);
 
             var customer = new User
             {
@@ -170,10 +151,6 @@ public sealed class CheckoutPriceChangeTests
                 0,
                 await verify.CustomerPayments.CountAsync());
         }
-        finally
-        {
-            // Delete only this test run's generated database.
-            await setup.Database.EnsureDeletedAsync();
-        }
+        finally { }
     }
 }

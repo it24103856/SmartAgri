@@ -19,21 +19,17 @@ public sealed class ProductAvailabilityTests
     public async Task Toggle_hides_and_restores_catalog_without_changing_review_and_checks_owner_version()
     {
         var connection = Environment.GetEnvironmentVariable("SMARTAGRI_TEST_CONNECTION");
-        Assert.False(string.IsNullOrEmpty(connection), "Set SMARTAGRI_TEST_CONNECTION to a local test server.");
-        var builder = new NpgsqlConnectionStringBuilder(connection)
-        {
-            Database = $"smartagri_availability_test_{Guid.NewGuid():N}",
-            Pooling = false
-        };
+        Assert.False(string.IsNullOrEmpty(connection), "Set SMARTAGRI_TEST_CONNECTION to the Supabase test database.");
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(builder.ConnectionString).Options);
+            .UseNpgsql(connection).Options);
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var suffix = Guid.NewGuid().ToString("N");
         try
         {
-            await db.Database.EnsureCreatedAsync();
-            var owner = new User { FullName = "Farmer", Email = "farmer@test.example", Role = "FARMER", PasswordHash = "test" };
-            var other = new User { FullName = "Other", Email = "other@test.example", Role = "FARMER", PasswordHash = "test" };
-            var customer = new User { FullName = "Customer", Email = "customer@test.example", PasswordHash = "test" };
-            var category = new Category { Name = "Vegetables", NormalizedName = "VEGETABLES" };
+            var owner = new User { FullName = $"Farmer {suffix}", Email = $"farmer-{suffix}@test.example", Role = "FARMER", PasswordHash = "test" };
+            var other = new User { FullName = $"Other {suffix}", Email = $"other-{suffix}@test.example", Role = "FARMER", PasswordHash = "test" };
+            var customer = new User { FullName = $"Customer {suffix}", Email = $"customer-{suffix}@test.example", PasswordHash = "test" };
+            var category = new Category { Name = $"Vegetables {suffix}", NormalizedName = $"VEGETABLES-{suffix.ToUpperInvariant()}" };
             db.AddRange(owner, other, customer, category);
             await db.SaveChangesAsync();
             var product = new Product {
@@ -56,7 +52,7 @@ public sealed class ProductAvailabilityTests
                 }
             };
             async Task<int> Count() {
-                var response = Assert.IsType<OkObjectResult>(await catalog.Products(null, null));
+                var response = Assert.IsType<OkObjectResult>(await catalog.Products(null, category.Id));
                 return JsonSerializer.SerializeToElement(response.Value).GetProperty("totalCount").GetInt32();
             }
             Assert.Equal(1, await Count());
@@ -98,6 +94,6 @@ public sealed class ProductAvailabilityTests
                 service.SetFarmerProductAvailabilityAsync(owner.Id, product.Id,
                     new() { IsActive = true, Version = product.Version }))).StatusCode);
         }
-        finally { await db.Database.EnsureDeletedAsync(); }
+        finally { await transaction.RollbackAsync(); }
     }
 }

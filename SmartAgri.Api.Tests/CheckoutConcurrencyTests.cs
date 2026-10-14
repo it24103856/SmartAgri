@@ -17,31 +17,8 @@ public sealed class CheckoutConcurrencyTests
     [Fact]
     public async Task Last_stock_item_can_be_bought_by_only_one_customer()
     {
-        var password =
-            Environment.GetEnvironmentVariable("SMARTAGRI_TEST_DB_PASSWORD");
-
-        Assert.False(
-            string.IsNullOrWhiteSpace(password),
-            "Set SMARTAGRI_TEST_DB_PASSWORD before running this test.");
-
-        // A new database name is generated for every test run.
-        // The application database connection string is never loaded.
-        var databaseName =
-            $"smartagri_test_{Guid.NewGuid():N}";
-
-        var connectionString = new NpgsqlConnectionStringBuilder
-        {
-            Host = "localhost",
-            Port = 5432,
-            Database = databaseName,
-            Username =
-                Environment.GetEnvironmentVariable("SMARTAGRI_TEST_DB_USER")
-                ?? "postgres",
-            Password = password!,
-            Pooling = false,
-            Timeout = 10,
-            CommandTimeout = 30
-        }.ConnectionString;
+        await using var database = await SupabaseTestDatabase.CreateAsync();
+        var connectionString = database.ConnectionString;
 
         ApplicationDbContext NewDb(
             SaveChangesInterceptor? interceptor = null)
@@ -62,7 +39,7 @@ public sealed class CheckoutConcurrencyTests
         {
             // Create tables using the current EF model.
             // This test does not test migration history.
-            await setup.Database.EnsureCreatedAsync();
+            await database.InitializeAsync(setup);
 
             var customerA = new User
             {
@@ -216,11 +193,7 @@ public sealed class CheckoutConcurrencyTests
                 1,
                 await verify.CustomerPayments.CountAsync());
         }
-        finally
-        {
-            // Delete only this run's generated temporary database.
-            await setup.Database.EnsureDeletedAsync();
-        }
+        finally { }
     }
 
     private sealed class TwoCheckoutSaveGate : SaveChangesInterceptor
