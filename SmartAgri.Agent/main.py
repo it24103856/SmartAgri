@@ -135,7 +135,7 @@ async def analyze_farmer_farm(
     try:
         await asyncio.wait_for(
             farm_analysis_lock.acquire(),
-            timeout=0.1,
+            timeout=10.0,
         )
     except asyncio.TimeoutError:
         raise HTTPException(

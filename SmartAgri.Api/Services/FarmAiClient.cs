@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -31,34 +32,51 @@ public sealed class FarmAiClient
                 "Agent service credentials are missing.");
         }
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            "internal/analyze-farm");
-
-        request.Headers.Add("X-Agent-Key", key);
-        request.Content = JsonContent.Create(payload);
-
-        using var response = await _http.SendAsync(request, ct);
-
-        if (!response.IsSuccessStatusCode)
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            throw new HttpRequestException(
-                "Farmer AI service request failed.",
-                null,
-                response.StatusCode);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                "internal/analyze-farm");
+
+            request.Headers.Add("X-Agent-Key", key);
+            request.Content = JsonContent.Create(payload);
+
+            using var response = await _http.SendAsync(request, ct);
+
+            if (response.StatusCode == HttpStatusCode.TooManyRequests &&
+                attempt < 3)
+            {
+                await Task.Delay(
+                    TimeSpan.FromSeconds(attempt * 5),
+                    ct);
+                continue;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    "Farmer AI service request failed.",
+                    null,
+                    response.StatusCode);
+            }
+
+            var result = await response.Content
+                .ReadFromJsonAsync<JsonElement>(
+                    cancellationToken: ct);
+
+            ValidateResult(
+                result,
+                workflowId,
+                farmId,
+                excludedCropIds);
+
+            return result;
         }
 
-        var result = await response.Content
-            .ReadFromJsonAsync<JsonElement>(
-                cancellationToken: ct);
-
-        ValidateResult(
-            result,
-            workflowId,
-            farmId,
-            excludedCropIds);
-
-        return result;
+        throw new HttpRequestException(
+            "Farmer AI service remained busy after retries.",
+            null,
+            HttpStatusCode.TooManyRequests);
     }
 
     private static void ValidateResult(
