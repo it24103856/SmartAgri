@@ -67,6 +67,18 @@ class LocalFallbackTests(unittest.TestCase):
         self.assertEqual(result.unavailable_items[0].requested_name, "gowa")
         self.assertNotIn("_used_fallback", result.model_dump())
 
+    def test_chili_spelling_variants_match_catalog_names(self):
+        products = [
+            product(17, "Fresh Green Chilies", 15000, "g"),
+            product(15, "Fresh Organic Red Tomatoes", 28000, "kg"),
+        ]
+        result = local_fallback(
+            payload("Fresh Green Chillies, Fresh Organic Red Tomatoes", products),
+            CatalogSelection,
+        )
+        self.assertEqual(result.eligible_product_ids, [17, 15])
+        self.assertEqual(result.unavailable_items, [])
+
     def test_explicit_selling_units_and_insufficient_stock(self):
         result = local_fallback(payload("2 kg rice, 7 apples", [product(1, "Rice", unit="kg"), product(2)]), CatalogSelection)
         self.assertEqual(result.required_items[0].quantity, 2)

@@ -135,6 +135,13 @@ _LOCAL_ALIASES = {
     "orange": "orange", "oranges": "orange", "orrange": "orange",
     "apple": "apple", "apples": "apple",
 }
+_LOCAL_WORD_ALIASES = {
+    "chili": "chili",
+    "chilis": "chili",
+    "chilies": "chili",
+    "chilli": "chili",
+    "chillies": "chili",
+}
 _LOCAL_UNITS = {
     "kg": "kg", "kgs": "kg", "kilogram": "kg", "kilograms": "kg",
     "g": "g", "gram": "g", "grams": "g",
@@ -151,7 +158,12 @@ _LOCAL_CATEGORY_ALIASES = {
 
 def _local_name(value):
     value = " ".join(unicodedata.normalize("NFKC", value).casefold().split())
-    return _LOCAL_ALIASES.get(value, value)
+    if value in _LOCAL_ALIASES:
+        return _LOCAL_ALIASES[value]
+    return " ".join(
+        _LOCAL_WORD_ALIASES.get(word, word)
+        for word in value.split()
+    )
 
 
 def _local_list(objective):
