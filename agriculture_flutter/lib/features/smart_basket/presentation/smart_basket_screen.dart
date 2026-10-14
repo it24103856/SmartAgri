@@ -811,32 +811,34 @@ class _SmartBasketDetailScreenState extends State<SmartBasketDetailScreen> {
                           : basketStatus(status),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      switch (basket['generationMode']) {
-                        'ai' => 'Prepared with AI (Gemini)',
-                        'catalog_fallback' =>
-                          'Prepared from catalog (fallback)',
-                        _ => 'Preparation source not recorded',
-                      },
-                      style: TextStyle(
-                        color: colors.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          basket['generationMode'] == 'ai'
+                              ? 'Prepared with AI (Gemini)'
+                              : 'Prepared from catalog',
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (basket['generationMode'] == 'catalog_fallback')
+                          Tooltip(
+                            message:
+                                'The basket was prepared from the available catalog.',
+                            child: Icon(
+                              Icons.info_outline,
+                              size: 17,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              if (basket['generationMode'] == 'catalog_fallback') ...[
-                const GlassCatalogCard(
-                  padding: EdgeInsets.all(18),
-                  child: Text(
-                    'Prepared directly from your shopping list while AI was unavailable. '
-                    'Please review the matched products, selling units and quantities.',
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
               if (unavailableItems.isNotEmpty) ...[
                 GlassCatalogCard(
                   padding: const EdgeInsets.all(18),
