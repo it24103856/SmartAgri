@@ -141,6 +141,12 @@ _LOCAL_UNITS = {
     "pack": "pack", "packs": "pack", "piece": "piece", "pieces": "piece",
     "unit": "unit", "units": "unit",
 }
+_LOCAL_CATEGORY_ALIASES = {
+    "fruit": "fruit",
+    "fruits": "fruit",
+    "vegetable": "vegetable",
+    "vegetables": "vegetable",
+}
 
 
 def _local_name(value):
@@ -193,10 +199,78 @@ def _local_list(objective):
     return result
 
 
+def _local_category_request(objective):
+    """Recognize a small, unambiguous mixed-category fallback request."""
+    text = " ".join(unicodedata.normalize("NFKC", objective).casefold().split())
+    if not re.search(r"\bmix(?:ed)?\b", text):
+        return None
+
+    if re.search(
+        r"\b(?:without|except|exclude|excluding|avoid|don't|dont|skip|remove|"
+        r"never|not|no|only|budget|under|within|cheapest|suggest|recommend|"
+        r"allergic|allergy|vegan|vegetarian|halal|kosher|free|or|instead|"
+        r"less|more|half|quarter|one|two|three|for|with)\b",
+        text,
+    ):
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+
+    match = re.search(r"\b(fruits?|vegetables?)\b", text)
+    if match is None and re.fullmatch(r"mix(?:ed)?\s+bucket|mix(?:ed)?\s+basket", text):
+        return "all"
+    if match is None:
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+
+    return _LOCAL_CATEGORY_ALIASES[match[1]]
+
+
 def _local_selection(payload):
-    requested = _local_list(payload["objective"])
+    requested_category = _local_category_request(payload["objective"])
+    requested = (
+        []
+        if requested_category is not None
+        else _local_list(payload["objective"])
+    )
     products = [CatalogProduct.model_validate(p) for p in payload["catalog"]]
     explicit_exclusions = set(payload.get("explicit_excluded_product_ids", []))
+
+    if requested_category is not None:
+        category_products = [
+            product for product in products
+            if (
+                requested_category == "all"
+                or (
+                    product.category_name
+                    and _LOCAL_CATEGORY_ALIASES.get(
+                        product.category_name.strip().casefold()
+                    ) == requested_category
+                )
+            )
+            and product.is_food
+            and product.approved
+            and product.stock_quantity > 0
+            and product.id not in explicit_exclusions
+        ]
+        unavailable = []
+        if not category_products:
+            unavailable.append(
+                UnavailableItem(
+                    requested_name=payload["objective"].strip(),
+                    reason="not_available",
+                )
+            )
+        return CatalogSelection(
+            eligible_product_ids=[p.id for p in category_products],
+            excluded_product_ids=sorted(
+                explicit_exclusions & {p.id for p in products}
+            ),
+            required_items=[],
+            unavailable_items=unavailable,
+            cover_all_categories=False,
+            fill_budget=payload.get("budget_minor") is not None,
+            fixed_list=False,
+            issues=[],
+        )
+
     required, unavailable = [], []
     for name, canonical, quantity, unit, exact in requested:
         matches = [p for p in products if _local_name(p.name) == canonical
