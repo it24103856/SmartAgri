@@ -26,6 +26,23 @@ from schemas import (
 logger = logging.getLogger("uvicorn.error")
 MODEL_NAME = "gemini-3.5-flash-lite"
 
+
+AGENT_CATEGORIES = {
+    "Planner": "Analysis",
+    "CatalogAgent": "Analysis",
+    "BasketAgent": "Action",
+    "Validator": "Validation",
+    "ReviewAgent": "Validation",
+}
+
+
+def agent_category(name: str) -> str:
+    try:
+        return AGENT_CATEGORIES[name]
+    except KeyError as error:
+        raise ValueError(f"Unknown basket agent: {name}") from error
+
+
 class ProposalRequest(StrictModel):
     workflow_id: UUID
     objective: str = Field(min_length=1, max_length=1000)
@@ -106,6 +123,19 @@ class ProposalRejected(Exception):
 
 
 FALLBACK_LIST_REQUIRED = "Local fallback needs a simple shopping list."
+_SCHEMA_DROP_KEYS = {
+    "default",
+    "title",
+    "minLength",
+    "maxLength",
+    "additionalProperties",
+    "maxItems",
+    "minItems",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+}
 
 # Name aliases only: IDs, prices, stock and selling units always come from
 # the supplied catalog. Do not use fuzzy matching to guess another product.
@@ -118,17 +148,35 @@ _LOCAL_ALIASES = {
     "orange": "orange", "oranges": "orange", "orrange": "orange",
     "apple": "apple", "apples": "apple",
 }
+_LOCAL_WORD_ALIASES = {
+    "chili": "chili",
+    "chilis": "chili",
+    "chilies": "chili",
+    "chilli": "chili",
+    "chillies": "chili",
+}
 _LOCAL_UNITS = {
     "kg": "kg", "kgs": "kg", "kilogram": "kg", "kilograms": "kg",
     "g": "g", "gram": "g", "grams": "g",
     "pack": "pack", "packs": "pack", "piece": "piece", "pieces": "piece",
     "unit": "unit", "units": "unit",
 }
+_LOCAL_CATEGORY_ALIASES = {
+    "fruit": "fruit",
+    "fruits": "fruit",
+    "vegetable": "vegetable",
+    "vegetables": "vegetable",
+}
 
 
 def _local_name(value):
     value = " ".join(unicodedata.normalize("NFKC", value).casefold().split())
-    return _LOCAL_ALIASES.get(value, value)
+    if value in _LOCAL_ALIASES:
+        return _LOCAL_ALIASES[value]
+    return " ".join(
+        _LOCAL_WORD_ALIASES.get(word, word)
+        for word in value.split()
+    )
 
 
 def _local_list(objective):
@@ -176,10 +224,78 @@ def _local_list(objective):
     return result
 
 
+def _local_category_request(objective):
+    """Recognize a small, unambiguous mixed-category fallback request."""
+    text = " ".join(unicodedata.normalize("NFKC", objective).casefold().split())
+    if not re.search(r"\bmix(?:ed)?\b", text):
+        return None
+
+    if re.search(
+        r"\b(?:without|except|exclude|excluding|avoid|don't|dont|skip|remove|"
+        r"never|not|no|only|budget|under|within|cheapest|suggest|recommend|"
+        r"allergic|allergy|vegan|vegetarian|halal|kosher|free|or|instead|"
+        r"less|more|half|quarter|one|two|three|for|with)\b",
+        text,
+    ):
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+
+    match = re.search(r"\b(fruits?|vegetables?)\b", text)
+    if match is None and re.fullmatch(r"mix(?:ed)?\s+bucket|mix(?:ed)?\s+basket", text):
+        return "all"
+    if match is None:
+        raise ProposalRejected(FALLBACK_LIST_REQUIRED)
+
+    return _LOCAL_CATEGORY_ALIASES[match[1]]
+
+
 def _local_selection(payload):
-    requested = _local_list(payload["objective"])
+    requested_category = _local_category_request(payload["objective"])
+    requested = (
+        []
+        if requested_category is not None
+        else _local_list(payload["objective"])
+    )
     products = [CatalogProduct.model_validate(p) for p in payload["catalog"]]
     explicit_exclusions = set(payload.get("explicit_excluded_product_ids", []))
+
+    if requested_category is not None:
+        category_products = [
+            product for product in products
+            if (
+                requested_category == "all"
+                or (
+                    product.category_name
+                    and _LOCAL_CATEGORY_ALIASES.get(
+                        product.category_name.strip().casefold()
+                    ) == requested_category
+                )
+            )
+            and product.is_food
+            and product.approved
+            and product.stock_quantity > 0
+            and product.id not in explicit_exclusions
+        ]
+        unavailable = []
+        if not category_products:
+            unavailable.append(
+                UnavailableItem(
+                    requested_name=payload["objective"].strip(),
+                    reason="not_available",
+                )
+            )
+        return CatalogSelection(
+            eligible_product_ids=[p.id for p in category_products],
+            excluded_product_ids=sorted(
+                explicit_exclusions & {p.id for p in products}
+            ),
+            required_items=[],
+            unavailable_items=unavailable,
+            cover_all_categories=False,
+            fill_budget=payload.get("budget_minor") is not None,
+            fixed_list=False,
+            issues=[],
+        )
+
     required, unavailable = [], []
     for name, canonical, quantity, unit, exact in requested:
         matches = [p for p in products if _local_name(p.name) == canonical
@@ -227,11 +343,21 @@ def _local_review(payload):
 
     if "basket" in payload:
         basket = payload["basket"]
+        try:
+            basket_items = [
+                BasketLine(
+                    product_id=item["product_id"],
+                    quantity=item["quantity"],
+                )
+                for item in basket.get("items", [])
+            ]
+        except (KeyError, TypeError, ValidationError):
+            return BasketReview(accepted=False, issues=["Basket contains invalid items."])
         checked = validate_basket(BasketValidationRequest(
             workflow_id=basket["workflow_id"], budget_minor=payload.get("budget_minor"),
             currency=basket["currency"], products=payload["catalog"],
             excluded_product_ids=expected.excluded_product_ids,
-            items=[BasketLine(product_id=i.product_id, quantity=i.quantity) for i in expected.required_items],
+            items=basket_items,
         ))
         checked_data = checked.model_dump(mode="json")
         if (not checked.valid or basket.get("valid") is not True or
@@ -244,7 +370,7 @@ def _local_review(payload):
 
 
 def local_fallback(payload, output_type):
-    print(f"\n⚠️  [FALLBACK TRIGGERED] Generating local fallback for {output_type.__name__}")
+    print(f"\n[FALLBACK TRIGGERED] Generating local fallback for {output_type.__name__}")
     if output_type is BasketPlan:
         _local_list(payload["objective"])
         result = BasketPlan(goal="Prepare the customer's shopping list", excluded_foods=[],
@@ -441,31 +567,18 @@ async def ask_model(client, role, instruction, payload, output_type):
 
     output_schema = output_type.model_json_schema()
 
-    def resolve_refs(value, defs):
+    def clean_schema(value):
         if isinstance(value, dict):
-            if "$ref" in value:
-                ref_name = value["$ref"].split("/")[-1]
-                if ref_name in defs:
-                    resolved = defs[ref_name].copy()
-                    value.clear()
-                    value.update(resolved)
-                    resolve_refs(value, defs)
-            else:
-                for k, v in list(value.items()):
-                    if k in ("default", "title", "minLength", "maxLength", "additionalProperties", "minimum", "maximum", "minItems", "maxItems", "exclusiveMinimum", "exclusiveMaximum", "anyOf"):
-                        value.pop(k, None)
-                    else:
-                        resolve_refs(v, defs)
+            for key in list(value):
+                if key in _SCHEMA_DROP_KEYS:
+                    value.pop(key)
+                else:
+                    clean_schema(value[key])
         elif isinstance(value, list):
             for item in value:
-                resolve_refs(item, defs)
+                clean_schema(item)
 
-    _schema_defs = output_schema.pop("$defs", {})
-    resolve_refs(output_schema, _schema_defs)
-
-    if output_type is CatalogSelection:
-        # We handle empty catalog validation locally if needed.
-        pass
+    clean_schema(output_schema)
 
     if output_type is CatalogSelection:
         print("\n===== CATALOG OUTPUT SCHEMA =====")
@@ -517,26 +630,35 @@ async def ask_model(client, role, instruction, payload, output_type):
             )
 
             # Show the actual error before retrying or using fallback.
-            print(f"\n❌ [GEMINI API ERROR]")
+            print(f"\n[GEMINI API ERROR]")
             print(f"   Agent:   {role}")
             print(f"   Model:   {os.getenv('GEMINI_MODEL', MODEL_NAME)}")
             print(f"   Attempt: {attempt + 1}/{max_retries}")
             print(f"   Code:    {error_code}")
             print(f"   Message: {error_message}\n")
+            logger.error(
+                "agent=%s | model=%s | attempt=%s/%s | code=%s | message=%s",
+                role,
+                os.getenv("GEMINI_MODEL", MODEL_NAME),
+                attempt + 1,
+                max_retries,
+                error_code,
+                error_message,
+            )
 
             retryable = (
-                error_code in {400, 429, 500, 502, 503, 504}
+                error_code in {429, 500, 502, 503, 504}
                 or isinstance(e, httpx.TransportError)
             )
 
             if retryable and attempt < max_retries - 1:
                 delay = 15 * (2 ** attempt)
-                print(f"⚠️  Gemini rate limit / busy. Waiting {delay} seconds before retry {attempt + 2}...")
+                print(f"Gemini rate limit / busy. Waiting {delay} seconds before retry {attempt + 2}...")
                 await asyncio.sleep(delay)
                 continue
 
             if provider_error:
-                print(f"⚠️  WARNING: Using local catalog fallback for agent={role} after error code={error_code}.")
+                print(f"WARNING: Using local catalog fallback for agent={role} after error code={error_code}.")
                 return local_fallback(payload, output_type)
 
             raise
@@ -549,10 +671,10 @@ async def ask_model(client, role, instruction, payload, output_type):
     try:
         return output_type.model_validate_json(content)
     except ValidationError as ve:
-        print(f"\n❌ [VALIDATION ERROR in {role}]")
+        print(f"\n[VALIDATION ERROR in {role}]")
         print(f"Raw output from Gemini:\n{content}\n")
         print(f"Error details:\n{ve}\n")
-        print(f"⚠️  WARNING: Using local catalog fallback due to invalid JSON.")
+        print(f"WARNING: Using local catalog fallback due to invalid JSON.")
         return local_fallback(payload, output_type)
 
 
@@ -648,6 +770,7 @@ async def generate_proposal(request: ProposalRequest):
         step = {
             "sequence": len(steps) + 1,
             "agent": name,
+            "category": agent_category(name),
             "status": "Started",
             "started_at": now(),
         }
@@ -919,6 +1042,7 @@ async def generate_proposal(request: ProposalRequest):
             build_step = {
                 "sequence": len(steps) + 1,
                 "agent": "BasketAgent",
+                "category": agent_category("BasketAgent"),
                 "tool": "build_basket",
                 "status": "Started",
                 "started_at": now(),
@@ -955,6 +1079,7 @@ async def generate_proposal(request: ProposalRequest):
             steps.append({
                 "sequence": len(steps) + 1,
                 "agent": "Validator",
+                "category": agent_category("Validator"),
                 "tool": "validate_basket",
                 "status": (
                     "Completed" if validation.valid else "Failed"

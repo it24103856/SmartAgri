@@ -7,6 +7,7 @@ from uuid import uuid4
 from google.genai import errors
 
 from basket_agents import (
+    AGENT_CATEGORIES, agent_category,
     BasketPlan, BasketReview, CatalogSelection, FALLBACK_LIST_REQUIRED,
     ProposalRejected, ProposalRequest, ask_model, generate_proposal,
     local_fallback,
@@ -28,6 +29,20 @@ def payload(objective="Apple", products=None, **extra):
 
 
 class LocalFallbackTests(unittest.TestCase):
+    def test_basket_agents_have_explicit_workflow_categories(self):
+        self.assertEqual(
+            AGENT_CATEGORIES,
+            {
+                "Planner": "Analysis",
+                "CatalogAgent": "Analysis",
+                "BasketAgent": "Action",
+                "Validator": "Validation",
+                "ReviewAgent": "Validation",
+            },
+        )
+        with self.assertRaises(ValueError):
+            agent_category("UnknownAgent")
+
     def test_extra_separators_do_not_reject_a_valid_list(self):
         products = [product(), product(2, "Orrange")]
         for objective in ("apple ,orrange,", ", apple,, ; orrange ; ",
@@ -52,16 +67,62 @@ class LocalFallbackTests(unittest.TestCase):
         self.assertEqual(result.unavailable_items[0].requested_name, "gowa")
         self.assertNotIn("_used_fallback", result.model_dump())
 
+    def test_chili_spelling_variants_match_catalog_names(self):
+        products = [
+            product(17, "Fresh Green Chilies", 15000, "g"),
+            product(15, "Fresh Organic Red Tomatoes", 28000, "kg"),
+        ]
+        result = local_fallback(
+            payload("Fresh Green Chillies, Fresh Organic Red Tomatoes", products),
+            CatalogSelection,
+        )
+        self.assertEqual(result.eligible_product_ids, [17, 15])
+        self.assertEqual(result.unavailable_items, [])
+
     def test_explicit_selling_units_and_insufficient_stock(self):
         result = local_fallback(payload("2 kg rice, 7 apples", [product(1, "Rice", unit="kg"), product(2)]), CatalogSelection)
         self.assertEqual(result.required_items[0].quantity, 2)
         self.assertEqual(result.unavailable_items[0].reason, "insufficient_stock")
 
     def test_ambiguous_constraints_or_quantities_never_become_success(self):
-        for objective in ("apple without nuts", "apple, don't include apple", "mixed basket",
+        for objective in ("apple without nuts", "apple, don't include apple",
                           "apple, vegan", "1.5 kg apple", "2 kg", "apple, apples", "0 apples"):
             with self.subTest(objective=objective), self.assertRaises(ProposalRejected):
                 local_fallback(payload(objective), CatalogSelection)
+
+    def test_mixed_category_request_uses_available_category_products(self):
+        products = [
+            product(1, "Tomatoes", category_name="Vegetables"),
+            product(2, "Green Chillies", category_name="Vegetables", price=150),
+            product(3, "Apple", category_name="Fruits"),
+        ]
+        result = local_fallback(
+            payload("mix vegetables bucket", products),
+            CatalogSelection,
+        )
+        self.assertEqual(result.eligible_product_ids, [1, 2])
+        self.assertFalse(result.fixed_list)
+        self.assertFalse(result.unavailable_items)
+
+    def test_mixed_category_request_reports_empty_category(self):
+        result = local_fallback(
+            payload("mix fruits bucket", [product(1, "Tomatoes", category_name="Vegetables")]),
+            CatalogSelection,
+        )
+        self.assertEqual(result.eligible_product_ids, [])
+        self.assertEqual(result.unavailable_items[0].requested_name, "mix fruits bucket")
+
+    def test_generic_mixed_bucket_uses_backend_scoped_catalog(self):
+        products = [
+            product(1, "Apple", category_name="Fruits"),
+            product(2, "Tomatoes", category_name="Vegetables"),
+        ]
+        request = payload("mix bucket", products)
+        request["budget_minor"] = 500000
+        result = local_fallback(request, CatalogSelection)
+        self.assertEqual(result.eligible_product_ids, [1, 2])
+        self.assertTrue(result.fill_budget)
+        self.assertFalse(result.unavailable_items)
 
     def test_does_not_guess_weight_to_pack_or_multiple_catalog_matches(self):
         for request in (payload("2 kg apples", [product(unit="pack")]),
@@ -102,6 +163,30 @@ class LocalFallbackTests(unittest.TestCase):
         basket["items"][0]["unit_price_minor"] = 100
         request["budget_minor"] = 99
         self.assertFalse(local_fallback(request, BasketReview).accepted)
+
+    def test_local_review_validates_generated_mixed_basket(self):
+        products = [
+            product(1, "Apple", 50000, "pack", 3, category_name="Fruits"),
+            product(2, "Tomatoes", 28000, "kg", 10, category_name="Vegetables"),
+        ]
+        request = payload("mix bucket", products)
+        request["budget_minor"] = 100000
+        selection = local_fallback(request, CatalogSelection)
+        request["selection"] = selection.model_dump()
+        request["basket"] = validate_basket(BasketValidationRequest(
+            workflow_id=uuid4(),
+            budget_minor=request["budget_minor"],
+            products=request["catalog"],
+            items=[
+                {"product_id": 1, "quantity": 1},
+                {"product_id": 2, "quantity": 1},
+            ],
+        )).model_dump(mode="json")
+
+        review = local_fallback(request, BasketReview)
+
+        self.assertTrue(review.accepted)
+        self.assertEqual(review.issues, [])
 
 
 class ProviderFallbackTests(unittest.IsolatedAsyncioTestCase):

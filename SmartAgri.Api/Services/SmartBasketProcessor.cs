@@ -117,6 +117,7 @@ public sealed class SmartBasketProcessor
 
             var excludedIds = ReadExclusions(workflow.ConstraintsJson);
             var categoryId = ReadCategoryId(workflow.ConstraintsJson);
+            var foodOnly = ReadFoodOnly(workflow.ConstraintsJson);
 
             // Current Python request contract supports at most 50 products.
             // Do not silently omit part of a larger catalog.
@@ -125,7 +126,7 @@ public sealed class SmartBasketProcessor
     .Include(product => product.Category)
     .Where(product =>
         (categoryId == null || product.CategoryId == categoryId) &&
-        product.IsFood &&
+        (!foodOnly || product.IsFood) &&
         (product.IsActive && product.Status == "APPROVED") &&
         product.StockQuantity > 0 &&
         product.Price > 0 &&
@@ -293,7 +294,7 @@ public sealed class SmartBasketProcessor
                 if (!freshProducts.TryGetValue(productId, out var product) ||
     (categoryId.HasValue &&
      product.CategoryId != categoryId.Value) ||
-    !product.IsFood ||
+    (foodOnly && !product.IsFood) ||
     (!product.IsActive || product.Status != "APPROVED") ||
     quantity < 1 ||
     quantity > 100000 ||
@@ -573,7 +574,14 @@ public sealed class SmartBasketProcessor
                 FinishedAt = DateTime.UtcNow,
                 OutputJson = JsonSerializer.Serialize(new
                 {
-                    reportedStatus = stepStatus
+                    reportedStatus = stepStatus,
+                    category = agent switch
+                    {
+                        "Planner" or "CatalogAgent" => "Analysis",
+                        "BasketAgent" => "Action",
+                        "Validator" or "ReviewAgent" => "Validation",
+                        _ => "Unknown"
+                    }
                 })
             });
         }
@@ -603,6 +611,12 @@ public sealed class SmartBasketProcessor
             throw new InvalidOperationException("Invalid exclusions.");
 
         return result;
+    }
+
+    private static bool ReadFoodOnly(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return SmartBasketCategoryScope.ReadFoodOnly(document.RootElement);
     }
 
     private static long ToMinor(decimal amount)
