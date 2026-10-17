@@ -22,6 +22,7 @@ public sealed class ProductAvailabilityTests
         Assert.False(string.IsNullOrEmpty(connection), "Set SMARTAGRI_TEST_CONNECTION to the Supabase test database.");
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connection).Options);
+        await db.Database.EnsureCreatedAsync();
         await using var transaction = await db.Database.BeginTransactionAsync();
         var suffix = Guid.NewGuid().ToString("N");
         try
