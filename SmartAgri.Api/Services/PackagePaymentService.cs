@@ -38,8 +38,6 @@ public sealed class PackagePaymentService
             "..",
             "SmartAgri.Private",
             "package-receipts"));
-
-        Directory.CreateDirectory(_receiptRoot);
     }
 
     private string StorageSetting(string name)
